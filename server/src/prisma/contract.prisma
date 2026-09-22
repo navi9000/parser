@@ -1,0 +1,24 @@
+// use prisma-8
+
+model User {
+  id    Uuid    @id @default(uuid())
+  login String @unique
+  password String
+}
+
+model Entity {
+  id Int @id @default(autoincrement())
+  url String @unique
+  name String?
+  review_count Int
+  avg_rating String
+}
+
+model Review {
+  id Int @id @default(autoincrement())
+  entity_id Int
+  entity Entity @relation(fields: [entity_id], references: [id])
+  author String
+  rating Int
+  text String
+}
