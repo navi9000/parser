@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { db } from '../prisma/db.js';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  async create(createUserDto: CreateUserDto) {
+    const { login, password } = createUserDto;
+
+    const plan = db.sql.public.user.insert([{ login, password }]).build();
+    const result = await db.runtime().query(plan);
+
+    return result;
   }
 
   findAll() {
