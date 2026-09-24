@@ -14,6 +14,18 @@ export class UsersService {
     return result;
   }
 
+  async findByName(name: string) {
+    const plan = db.sql.public.user
+      .select('id', 'login', 'password')
+      .where((f, fns) => fns.eq(f.login, name))
+      .limit(1)
+      .build();
+
+    const result = await db.runtime().query(plan);
+
+    return result[0] ?? null;
+  }
+
   findAll() {
     return `This action returns all users`;
   }
