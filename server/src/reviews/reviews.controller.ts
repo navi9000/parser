@@ -25,7 +25,7 @@ export class ReviewsController {
 
   @Get('entities/:id')
   @UseGuards(AuthGuard)
-  getByEntity(@Param() params: { id: string }) {
-    return this.reviewsService.getByEntity(params.id);
+  getByEntity(@Param('id') id: string) {
+    return this.reviewsService.getByEntity(id);
   }
 }

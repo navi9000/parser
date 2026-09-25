@@ -12,6 +12,7 @@ import { EntitiesService } from './entities.service.js';
 import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
+import { UpdateEntityDto } from './dto/update-entity.dto.js';
 
 @Controller('entities')
 export class EntitiesController {
@@ -25,17 +26,23 @@ export class EntitiesController {
   }
 
   @Get()
+  @UseGuards(AuthGuard)
   getAll() {
     return this.entitiesService.getAll();
   }
 
   @Get(':id')
-  getById(@Param() params: any) {
-    return this.entitiesService.getById(params.id);
+  @UseGuards(AuthGuard)
+  getById(@Param('id') id: string) {
+    return this.entitiesService.getById(id);
   }
 
   @Put(':id')
-  updateById(@Param() params: any, @Body() updateEntityDto: any) {
-    return this.entitiesService.update(params.id, updateEntityDto);
+  @UsePipes(new ValidationPipe())
+  updateById(
+    @Param('id') id: string,
+    @Body() updateEntityDto: UpdateEntityDto,
+  ) {
+    return this.entitiesService.update(id, updateEntityDto);
   }
 }

@@ -1,20 +1,39 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { db } from '../prisma/db.js';
+import { UpdateEntityDto } from './dto/update-entity.dto.js';
 
 @Injectable()
 export class EntitiesService {
   async create(createEntityDto: CreateEntityDto) {
-    const { url, ...rest } = createEntityDto;
-    const name = rest?.name ?? null;
-    const review_count = rest.review_count ?? 0;
-    const avg_rating = rest.avg_rating ?? '0.00';
-    const plan = db.sql.public.entity
-      .insert([{ url, name, review_count, avg_rating }])
-      .returning('id', 'url', 'name', 'review_count', 'avg_rating')
-      .build();
-    const result = await db.runtime().query(plan);
-    return result;
+    try {
+      const { url, ...rest } = createEntityDto;
+      const name = rest?.name ?? null;
+      const review_count = rest.review_count ?? 0;
+      const avg_rating = rest.avg_rating ?? '0.00';
+      const plan = db.sql.public.entity
+        .insert([{ url, name, review_count, avg_rating }])
+        .returning('id', 'url', 'name', 'review_count', 'avg_rating')
+        .build();
+      const result = await db.runtime().query(plan);
+      return result;
+    } catch (err) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'constraint' in err &&
+        err.constraint === 'entity_url_key'
+      ) {
+        throw new ConflictException('Url уже существует');
+      }
+      throw new InternalServerErrorException(err);
+    }
   }
 
   async getAll() {
@@ -27,9 +46,13 @@ export class EntitiesService {
   }
 
   async getById(id: string) {
+    const entityId = +id;
+    if (isNaN(entityId)) {
+      throw new NotFoundException();
+    }
     const plan = db.sql.public.entity
       .select('id', 'url', 'name', 'avg_rating', 'review_count')
-      .where((f, fns) => fns.eq(f.id, +id))
+      .where((f, fns) => fns.eq(f.id, entityId))
       .limit(1)
       .build();
 
@@ -41,11 +64,28 @@ export class EntitiesService {
     return result[0];
   }
 
-  async update(id: string, updateEntityDto: any) {
-    console.log({ id, updateEntityDto });
+  async update(id: string, updateEntityDto: UpdateEntityDto) {
+    const entityId = +id;
+    if (isNaN(entityId)) {
+      throw new NotFoundException();
+    }
+    const { name, avg_rating, review_count } = updateEntityDto;
+    const updateData: Record<string, any> = {};
+    if (typeof name !== 'undefined') {
+      updateData.name = name;
+    }
+    if (typeof avg_rating !== 'undefined') {
+      updateData.avg_rating = avg_rating;
+    }
+    if (typeof review_count !== 'undefined') {
+      updateData.review_count = review_count;
+    }
+    if (!Object.keys(updateData).length) {
+      throw new BadRequestException('Не указаны параметры');
+    }
     const plan = db.sql.public.entity
-      .update({ ...updateEntityDto })
-      .where((f, fns) => fns.eq(f.id, +id))
+      .update(updateData)
+      .where((f, fns) => fns.eq(f.id, entityId))
       .returning('id', 'name', 'url', 'avg_rating', 'review_count')
       .build();
 
