@@ -1,18 +1,31 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { ReviewsService } from './reviews.service.js';
+import { CreateReviewDto } from './dto/create-review.dto.js';
+import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
+import { AuthGuard } from '../auth/auth.guard.js';
 
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
-  create(@Body() createReviewDto: any) {
+  @UseGuards(AuthGuard)
+  @UsePipes(new ValidationPipe())
+  create(@Body() createReviewDto: CreateReviewDto) {
     return this.reviewsService.create(createReviewDto);
   }
 
   @Get('entities/:id')
-  getByEntity(@Param() params: any) {
-    console.log({ id: params.id });
+  @UseGuards(AuthGuard)
+  getByEntity(@Param() params: { id: string }) {
     return this.reviewsService.getByEntity(params.id);
   }
 }

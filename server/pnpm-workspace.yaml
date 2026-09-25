@@ -1,4 +1,4 @@
 allowBuilds:
   esbuild: false
-  msgpackr-extract: set this to true or false
-  workerd: set this to true or false
+  msgpackr-extract: false
+  workerd: false
