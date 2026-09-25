@@ -5,9 +5,12 @@ import {
 } from '@nestjs/common';
 import { db } from '../prisma/db.js';
 import { CreateReviewDto } from './dto/create-review.dto.js';
+import { EntitiesService } from '../entities/entities.service.js';
 
 @Injectable()
 export class ReviewsService {
+  constructor(private readonly entitiesService: EntitiesService) {}
+
   async create(createReviewDto: CreateReviewDto) {
     try {
       const { entity_id, author, rating, text } = createReviewDto;
@@ -16,9 +19,11 @@ export class ReviewsService {
         .returning('id', 'entity_id', 'author', 'rating', 'text')
         .build();
 
-      const result = await db.runtime().query(plan);
+      const result = (await db.runtime().query(plan))[0];
+      const newRating = result.rating;
+      await this.entitiesService.updateStats(entity_id.toString(), newRating);
 
-      return result[0];
+      return result;
     } catch (err) {
       if (
         err &&

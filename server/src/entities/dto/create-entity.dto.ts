@@ -13,13 +13,13 @@ export class CreateEntityDto {
 
   @IsString()
   @IsOptional()
-  readonly name: string;
+  readonly name?: string;
 
   @IsInt()
   @IsOptional()
-  readonly review_count: number;
+  readonly review_count?: number;
 
   @IsDecimal()
   @IsOptional()
-  readonly avg_rating: string;
+  readonly avg_rating?: string;
 }

@@ -6,5 +6,6 @@ import { ReviewsService } from '../reviews/reviews.service.js';
 @Module({
   controllers: [EntitiesController],
   providers: [EntitiesService, ReviewsService],
+  exports: [EntitiesService],
 })
 export class EntitiesModule {}

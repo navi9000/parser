@@ -96,4 +96,20 @@ export class EntitiesService {
     }
     return result[0];
   }
+
+  async updateStats(id: string, newRating: number) {
+    const { avg_rating, review_count } = await this.getById(id);
+
+    const payload = {
+      review_count: review_count + 1,
+      avg_rating: (
+        (Number(avg_rating) * review_count * 100 + newRating * 100) /
+        (100 * (review_count + 1))
+      ).toFixed(2),
+    };
+
+    const result = await this.update(id, payload);
+
+    return result;
+  }
 }
