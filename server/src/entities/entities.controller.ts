@@ -13,10 +13,14 @@ import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { AuthGuard } from '../auth/auth.guard.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
+import { ReviewsService } from '../reviews/reviews.service.js';
 
 @Controller('entities')
 export class EntitiesController {
-  constructor(private readonly entitiesService: EntitiesService) {}
+  constructor(
+    private readonly entitiesService: EntitiesService,
+    private readonly reviewsService: ReviewsService,
+  ) {}
 
   @UseGuards(AuthGuard)
   @UsePipes(new ValidationPipe())
@@ -38,11 +42,18 @@ export class EntitiesController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard)
   @UsePipes(new ValidationPipe())
   updateById(
     @Param('id') id: string,
     @Body() updateEntityDto: UpdateEntityDto,
   ) {
     return this.entitiesService.update(id, updateEntityDto);
+  }
+
+  @Get(':id/reviews')
+  @UseGuards(AuthGuard)
+  getCommentsByEntity(@Param('id') id: string) {
+    return this.reviewsService.getCommentsByEntity(id);
   }
 }

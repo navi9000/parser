@@ -32,7 +32,7 @@ export class ReviewsService {
     }
   }
 
-  async getByEntity(id: string) {
+  async getCommentsByEntity(id: string) {
     const entityId = +id;
     if (isNaN(entityId)) {
       throw new NotFoundException();
