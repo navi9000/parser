@@ -5,7 +5,6 @@ import {
   Post,
   HttpCode,
   HttpStatus,
-  UsePipes,
   Request,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
@@ -19,9 +18,8 @@ export class AuthController {
 
   @Public()
   @HttpCode(HttpStatus.OK)
-  @UsePipes(new ValidationPipe())
   @Post('login')
-  signIn(@Body() signInDto: SignInDto) {
+  signIn(@Body(ValidationPipe) signInDto: SignInDto) {
     return this.authService.signIn(signInDto.login, signInDto.password);
   }
 
