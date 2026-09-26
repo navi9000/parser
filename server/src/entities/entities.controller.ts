@@ -12,6 +12,7 @@ import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
 import { ReviewsService } from '../reviews/reviews.service.js';
+import { CreateReviewDto } from '../reviews/dto/create-review.dto.js';
 
 @Controller('entities')
 export class EntitiesController {
@@ -48,5 +49,14 @@ export class EntitiesController {
   @Get(':id/reviews')
   getCommentsByEntity(@Param('id') id: string) {
     return this.reviewsService.getCommentsByEntity(id);
+  }
+
+  @Post(':id/reviews')
+  @UsePipes(new ValidationPipe())
+  createReview(
+    @Param('id') id: string,
+    @Body() createReviewDto: CreateReviewDto,
+  ) {
+    return this.reviewsService.create(id, createReviewDto);
   }
 }

@@ -11,17 +11,21 @@ import { EntitiesService } from '../entities/entities.service.js';
 export class ReviewsService {
   constructor(private readonly entitiesService: EntitiesService) {}
 
-  async create(createReviewDto: CreateReviewDto) {
+  async create(id: string, createReviewDto: CreateReviewDto) {
+    const entityId = +id;
+    if (isNaN(entityId)) {
+      throw new NotFoundException();
+    }
     try {
-      const { entity_id, author, rating, text } = createReviewDto;
+      const { author, rating, text } = createReviewDto;
       const plan = db.sql.public.review
-        .insert([{ entity_id, author, rating, text }])
+        .insert([{ entity_id: entityId, author, rating, text }])
         .returning('id', 'entity_id', 'author', 'rating', 'text')
         .build();
 
       const result = (await db.runtime().query(plan))[0];
       const newRating = result.rating;
-      await this.entitiesService.updateStats(entity_id.toString(), newRating);
+      await this.entitiesService.updateStats(id, newRating);
 
       return result;
     } catch (err) {

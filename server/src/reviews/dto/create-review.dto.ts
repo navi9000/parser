@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsInt, IsString, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsString, IsEnum } from 'class-validator';
 
 enum Rating {
   ONE = 1,
@@ -9,10 +9,6 @@ enum Rating {
 }
 
 export class CreateReviewDto {
-  @IsNotEmpty()
-  @IsInt()
-  readonly entity_id: number;
-
   @IsNotEmpty()
   @IsString()
   readonly author: string;
