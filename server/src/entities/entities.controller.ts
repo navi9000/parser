@@ -13,6 +13,7 @@ import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
 import { ReviewsService } from '../reviews/reviews.service.js';
 import { CreateReviewDto } from '../reviews/dto/create-review.dto.js';
+import { IsStringifiedNumberPipe } from '../shared/pipes/is-stringified-number.pipe.js';
 
 @Controller('entities')
 export class EntitiesController {
@@ -33,28 +34,32 @@ export class EntitiesController {
   }
 
   @Get(':id')
-  getById(@Param('id') id: string) {
+  @UsePipes(new IsStringifiedNumberPipe())
+  getById(@Param('id') id: number) {
     return this.entitiesService.getById(id);
   }
 
   @Put(':id')
   @UsePipes(new ValidationPipe())
+  @UsePipes(new IsStringifiedNumberPipe())
   updateById(
-    @Param('id') id: string,
+    @Param('id') id: number,
     @Body() updateEntityDto: UpdateEntityDto,
   ) {
     return this.entitiesService.update(id, updateEntityDto);
   }
 
   @Get(':id/reviews')
-  getCommentsByEntity(@Param('id') id: string) {
+  @UsePipes(new IsStringifiedNumberPipe())
+  getCommentsByEntity(@Param('id') id: number) {
     return this.reviewsService.getCommentsByEntity(id);
   }
 
   @Post(':id/reviews')
   @UsePipes(new ValidationPipe())
+  @UsePipes(new IsStringifiedNumberPipe())
   createReview(
-    @Param('id') id: string,
+    @Param('id') id: number,
     @Body() createReviewDto: CreateReviewDto,
   ) {
     return this.reviewsService.create(id, createReviewDto);

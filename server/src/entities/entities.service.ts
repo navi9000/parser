@@ -45,14 +45,10 @@ export class EntitiesService {
     return result;
   }
 
-  async getById(id: string) {
-    const entityId = +id;
-    if (isNaN(entityId)) {
-      throw new NotFoundException();
-    }
+  async getById(id: number) {
     const plan = db.sql.public.entity
       .select('id', 'url', 'name', 'avg_rating', 'review_count')
-      .where((f, fns) => fns.eq(f.id, entityId))
+      .where((f, fns) => fns.eq(f.id, id))
       .limit(1)
       .build();
 
@@ -64,11 +60,7 @@ export class EntitiesService {
     return result[0];
   }
 
-  async update(id: string, updateEntityDto: UpdateEntityDto) {
-    const entityId = +id;
-    if (isNaN(entityId)) {
-      throw new NotFoundException();
-    }
+  async update(id: number, updateEntityDto: UpdateEntityDto) {
     const { name, avg_rating, review_count } = updateEntityDto;
     const updateData: Record<string, any> = {};
     if (typeof name !== 'undefined') {
@@ -85,7 +77,7 @@ export class EntitiesService {
     }
     const plan = db.sql.public.entity
       .update(updateData)
-      .where((f, fns) => fns.eq(f.id, entityId))
+      .where((f, fns) => fns.eq(f.id, id))
       .returning('id', 'name', 'url', 'avg_rating', 'review_count')
       .build();
 
@@ -97,9 +89,8 @@ export class EntitiesService {
     return result[0];
   }
 
-  async updateStats(id: string, newRating: number) {
+  async updateStats(id: number, newRating: number) {
     const { avg_rating, review_count } = await this.getById(id);
-
     const payload = {
       review_count: review_count + 1,
       avg_rating: (

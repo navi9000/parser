@@ -11,15 +11,11 @@ import { EntitiesService } from '../entities/entities.service.js';
 export class ReviewsService {
   constructor(private readonly entitiesService: EntitiesService) {}
 
-  async create(id: string, createReviewDto: CreateReviewDto) {
-    const entityId = +id;
-    if (isNaN(entityId)) {
-      throw new NotFoundException();
-    }
+  async create(id: number, createReviewDto: CreateReviewDto) {
     try {
       const { author, rating, text } = createReviewDto;
       const plan = db.sql.public.review
-        .insert([{ entity_id: entityId, author, rating, text }])
+        .insert([{ entity_id: id, author, rating, text }])
         .returning('id', 'entity_id', 'author', 'rating', 'text')
         .build();
 
@@ -41,14 +37,10 @@ export class ReviewsService {
     }
   }
 
-  async getCommentsByEntity(id: string) {
-    const entityId = +id;
-    if (isNaN(entityId)) {
-      throw new NotFoundException();
-    }
+  async getCommentsByEntity(id: number) {
     const plan = db.sql.public.review
       .select('id', 'author', 'rating', 'text')
-      .where((f, fns) => fns.eq(f.entity_id, entityId))
+      .where((f, fns) => fns.eq(f.entity_id, id))
       .build();
 
     const result = await db.runtime().query(plan);
