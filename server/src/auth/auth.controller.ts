@@ -5,19 +5,19 @@ import {
   Post,
   HttpCode,
   HttpStatus,
-  UseGuards,
   UsePipes,
   Request,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { SignInDto } from './dto/sign-in.dto.js';
-import { AuthGuard } from './auth.guard.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
+import { Public } from '../shared/decorators/public.decorator.js';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe())
   @Post('login')
@@ -25,7 +25,6 @@ export class AuthController {
     return this.authService.signIn(signInDto.login, signInDto.password);
   }
 
-  @UseGuards(AuthGuard)
   @Get('profile')
   getProfile(@Request() req: any) {
     return req.user;
