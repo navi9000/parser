@@ -1,21 +1,28 @@
 <template>
   <v-card-text class="pb-0">
     <div class="d-flex ga-2 align-center">
-      <div class="align-self-center">John Doe</div>
+      <div class="align-self-center">{{ review.author }}</div>
       <v-rating
         :length="5"
-        :model-value="3"
+        :model-value="review.rating"
         size="sm"
         color="yellow"
         readonly
       />
     </div>
     <p>
-      Lorem ipsum dolor, sit amet consectetur adipisicing elit. Sequi eius
-      debitis autem expedita, dolores distinctio voluptatem accusantium sint.
-      Temporibus aliquid totam sequi porro dolores. Ad beatae quasi quas?
-      Consectetur, distinctio.
+      {{ review.text }}
     </p>
     <v-divider />
   </v-card-text>
 </template>
+
+<script setup lang="ts">
+import type { Review } from "../../../entities/review"
+
+interface Props {
+  review: Review
+}
+
+const { review } = defineProps<Props>()
+</script>
