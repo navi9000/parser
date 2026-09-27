@@ -1,9 +1,13 @@
 <template>
   <div class="d-flex justify-center align-center pa-2 container">
     <v-sheet width="300">
-      <v-form class="pa-2" @submit="onSubmit">
-        <v-text-field v-model="login" label="Логин"></v-text-field>
-        <v-text-field v-model="password" label="Пароль"></v-text-field>
+      <v-form class="pa-2" @submit="onSubmit" autocomplete="off">
+        <v-text-field v-model="login" label="Логин" single-line></v-text-field>
+        <v-text-field
+          v-model="password"
+          label="Пароль"
+          single-line
+        ></v-text-field>
         <v-btn type="submit" block>Войти</v-btn>
       </v-form>
     </v-sheet>
