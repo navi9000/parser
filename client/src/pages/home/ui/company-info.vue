@@ -1,5 +1,8 @@
 <template>
-  <v-card v-if="company">
+  <div v-if="loading" class="d-flex justify-center align-center loading">
+    <v-progress-circular></v-progress-circular>
+  </div>
+  <v-card v-else-if="company">
     <v-card-title>{{ company.name }}</v-card-title>
     <v-card-subtitle>{{ company.url }}</v-card-subtitle>
     <v-card-text>
@@ -10,26 +13,28 @@
       <v-btn>Обновить данные</v-btn>
     </v-card-actions>
   </v-card>
+  <div v-else-if="error">
+    <v-card-title>Не найдено</v-card-title>
+  </div>
+  <div v-else>
+    <v-card-title>Введите наименование компании или url</v-card-title>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { watch } from "vue"
-import { useRoute } from "vuetify/lib/composables/router.mjs"
 import type { Entity } from "../../../entities/entity"
 
 interface Props {
   company: Entity | null
+  error: boolean
+  loading: boolean
 }
 
-const { company } = defineProps<Props>()
-
-const route = useRoute()
-
-watch(
-  () => route.value?.query.search,
-  (value, oldValue) => {
-    console.log({ value, oldValue })
-  },
-  { immediate: true },
-)
+const { company, error, loading } = defineProps<Props>()
 </script>
+
+<style>
+.loading {
+  height: 230px;
+}
+</style>
