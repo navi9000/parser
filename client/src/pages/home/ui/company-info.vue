@@ -1,8 +1,8 @@
 <template>
-  <div v-if="loading" class="d-flex justify-center align-center loading">
+  <div v-if="loading" class="company-info d-flex justify-center align-center">
     <v-progress-circular></v-progress-circular>
   </div>
-  <v-card v-else-if="company">
+  <v-card class="company-info" v-else-if="company">
     <v-card-title>{{ company.name }}</v-card-title>
     <v-card-subtitle>{{ company.url }}</v-card-subtitle>
     <v-card-text>
@@ -13,10 +13,10 @@
       <v-btn>Обновить данные</v-btn>
     </v-card-actions>
   </v-card>
-  <div v-else-if="error">
+  <div class="company-info" v-else-if="error">
     <v-card-title>Не найдено</v-card-title>
   </div>
-  <div v-else>
+  <div class="company-info" v-else>
     <v-card-title>Введите наименование компании или url</v-card-title>
   </div>
 </template>
@@ -34,7 +34,7 @@ const { company, error, loading } = defineProps<Props>()
 </script>
 
 <style>
-.loading {
+.company-info {
   height: 230px;
 }
 </style>

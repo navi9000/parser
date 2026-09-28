@@ -1,11 +1,13 @@
 <template>
-  <div class="pa-2 d-flex ga-2 flex-column">
-    <company-search />
-    <company-info
-      :company="entityData.data"
-      :error="entityData.error"
-      :loading="entityData.loading"
-    />
+  <div class="home-page pa-2 d-flex ga-2 flex-column h-screen overflow-hidden">
+    <div class="home-page__top-section d-flex ga-2 flex-column">
+      <company-search />
+      <company-info
+        :company="entityData.data"
+        :error="entityData.error"
+        :loading="entityData.loading"
+      />
+    </div>
     <comment-list
       :review-list="reviewListData.data"
       :loading="reviewListData.loading"
@@ -91,3 +93,20 @@ watch(
   },
 )
 </script>
+
+<style scoped>
+:global(html),
+:global(body),
+:global(#app) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.home-page {
+  box-sizing: border-box;
+}
+
+.home-page__top-section {
+  flex: 0 0 294px;
+}
+</style>
