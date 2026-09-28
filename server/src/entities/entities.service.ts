@@ -17,12 +17,13 @@ export class EntitiesService {
       const name = rest?.name ?? null;
       const review_count = rest.review_count ?? 0;
       const avg_rating = rest.avg_rating ?? '0.00';
-      const plan = db.sql.public.entity
-        .insert([{ url, name, review_count, avg_rating }])
-        .returning('id', 'url', 'name', 'review_count', 'avg_rating')
-        .build();
-      const result = await db.runtime().query(plan);
-      return result;
+      const result = await db.orm.public.Entity.create({
+        url,
+        name,
+        avg_rating,
+        review_count,
+      });
+      return { ...result };
     } catch (err) {
       if (
         err &&
@@ -37,27 +38,21 @@ export class EntitiesService {
   }
 
   async getAll() {
-    const plan = db.sql.public.entity
-      .select('id', 'url', 'name', 'avg_rating', 'review_count')
-      .build();
-
-    const result = await db.runtime().query(plan);
-    return result;
+    return await db.orm.public.Entity.select(
+      'id',
+      'url',
+      'name',
+      'avg_rating',
+      'review_count',
+    ).all();
   }
 
   async getById(id: number) {
-    const plan = db.sql.public.entity
-      .select('id', 'url', 'name', 'avg_rating', 'review_count')
-      .where((f, fns) => fns.eq(f.id, id))
-      .limit(1)
-      .build();
-
-    const result = await db.runtime().query(plan);
-    if (!result.length) {
+    const result = await db.orm.public.Entity.where({ id }).first();
+    if (!result) {
       throw new NotFoundException();
     }
-
-    return result[0];
+    return { ...result };
   }
 
   async update(id: number, updateEntityDto: UpdateEntityDto) {
@@ -75,18 +70,12 @@ export class EntitiesService {
     if (!Object.keys(updateData).length) {
       throw new BadRequestException('Не указаны параметры');
     }
-    const plan = db.sql.public.entity
-      .update(updateData)
-      .where((f, fns) => fns.eq(f.id, id))
-      .returning('id', 'name', 'url', 'avg_rating', 'review_count')
-      .build();
 
-    const result = await db.runtime().query(plan);
-
-    if (!result.length) {
+    const result = await db.orm.public.Entity.where({ id }).update(updateData);
+    if (!result) {
       throw new NotFoundException();
     }
-    return result[0];
+    return { ...result };
   }
 
   async updateStats(id: number, newRating: number) {

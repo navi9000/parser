@@ -6,22 +6,12 @@ import { db } from '../prisma/db.js';
 export class UsersService {
   async create(createUserDto: CreateUserDto) {
     const { login, password } = createUserDto;
-
-    const plan = db.sql.public.user.insert([{ login, password }]).build();
-    const result = await db.runtime().query(plan);
-
-    return result;
+    const result = await db.orm.public.User.create({ login, password });
+    return { ...result };
   }
 
   async findByName(name: string) {
-    const plan = db.sql.public.user
-      .select('id', 'login', 'password')
-      .where((f, fns) => fns.eq(f.login, name))
-      .limit(1)
-      .build();
-
-    const result = await db.runtime().query(plan);
-
-    return result[0] ?? null;
+    const result = await db.orm.public.User.where({ login: name }).first();
+    return result ? { ...result } : null;
   }
 }

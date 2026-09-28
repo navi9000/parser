@@ -11,19 +11,30 @@ import { EntitiesService } from '../entities/entities.service.js';
 export class ReviewsService {
   constructor(private readonly entitiesService: EntitiesService) {}
 
-  async create(id: number, createReviewDto: CreateReviewDto) {
+  async getCommentsByEntity(id: number) {
+    const result = await db.orm.public.Review.where({ entity_id: id })
+      .select('id', 'author', 'rating', 'text')
+      .all();
+    if (!result.length) {
+      throw new NotFoundException();
+    }
+
+    return result;
+  }
+
+  async create(entity_id: number, createReviewDto: CreateReviewDto) {
     try {
       const { author, rating, text } = createReviewDto;
-      const plan = db.sql.public.review
-        .insert([{ entity_id: id, author, rating, text }])
-        .returning('id', 'entity_id', 'author', 'rating', 'text')
-        .build();
+      const result = await db.orm.public.Review.create({
+        author,
+        rating,
+        text,
+        entity_id,
+      });
 
-      const result = (await db.runtime().query(plan))[0];
       const newRating = result.rating;
-      await this.entitiesService.updateStats(id, newRating);
-
-      return result;
+      await this.entitiesService.updateStats(entity_id, newRating);
+      return { ...result };
     } catch (err) {
       if (
         err &&
@@ -35,20 +46,5 @@ export class ReviewsService {
       }
       throw new InternalServerErrorException(err);
     }
-  }
-
-  async getCommentsByEntity(id: number) {
-    const plan = db.sql.public.review
-      .select('id', 'author', 'rating', 'text')
-      .where((f, fns) => fns.eq(f.entity_id, id))
-      .build();
-
-    const result = await db.runtime().query(plan);
-
-    if (!result.length) {
-      throw new NotFoundException();
-    }
-
-    return result;
   }
 }
