@@ -47,6 +47,14 @@ export class EntitiesService {
     ).all();
   }
 
+  async getByInput(input: string) {
+    const result = await db.orm.public.Entity.where({ url: input }).first();
+    if (!result) {
+      throw new NotFoundException();
+    }
+    return { ...result };
+  }
+
   async getById(id: number) {
     const result = await db.orm.public.Entity.where({ id }).first();
     if (!result) {

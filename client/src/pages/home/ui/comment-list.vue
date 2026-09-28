@@ -1,5 +1,5 @@
 <template>
-  <v-sheet class="rounded-md elevation-1 pb-4" v-if="reviewList.length">
+  <v-sheet class="rounded-md elevation-1 pb-4" v-if="reviewList?.length">
     <v-card-title>Комментарии</v-card-title>
     <Comment v-for="review in reviewList" :key="review.id" :review="review" />
   </v-sheet>
@@ -10,7 +10,7 @@ import type { Review } from "../../../entities/review"
 import Comment from "./comment.vue"
 
 interface Props {
-  reviewList: Review[]
+  reviewList: Review[] | null
 }
 
 const { reviewList } = defineProps<Props>()

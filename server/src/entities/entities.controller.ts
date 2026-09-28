@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { EntitiesService } from './entities.service.js';
 import { CreateEntityDto } from './dto/create-entity.dto.js';
@@ -29,6 +30,11 @@ export class EntitiesController {
   @Get()
   getAll() {
     return this.entitiesService.getAll();
+  }
+
+  @Get('search')
+  getByInput(@Query('v') search: string) {
+    return this.entitiesService.getByInput(search);
   }
 
   @Get(':id')
