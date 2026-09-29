@@ -8,6 +8,8 @@ import {
 import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { db } from '../prisma/db.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
+import puppeteer from 'puppeteer';
+import fs from 'node:fs';
 
 @Injectable()
 export class EntitiesService {
@@ -99,5 +101,71 @@ export class EntitiesService {
     const result = await this.update(id, payload);
 
     return result;
+  }
+
+  async testPuppeteer() {
+    console.log(1);
+    const browser = await puppeteer.launch();
+    console.log(2);
+    const page = await browser.newPage();
+    console.log(3);
+
+    await page.setViewport({ width: 1800, height: 1080 });
+
+    // await page.goto(
+    //   'https://yandex.com/maps/org/itsports/81786207255/reviews/?ll=37.410879%2C55.834057&tab=reviews&z=16.53',
+    // );
+    // await page.goto(
+    //   'https://yandex.com/maps/org/itsports/81786207255/?ll=37.410879%2C55.834057&z=16',
+    // );
+
+    await page.emulateCPUThrottling(1.49);
+    await page.setExtraHTTPHeaders({
+      'User-Agent':
+        'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36',
+    });
+
+    const response = await page.goto(
+      'https://yandex.com/maps/org/itsports/81786207255/reviews/',
+    );
+
+    const pageContent = await page.content();
+
+    fs.writeFile('./yandex-maps.html', pageContent, () => {});
+
+    // console.log({ page_content: await page.content() });
+
+    console.log(4);
+    await page.waitForSelector('body');
+    console.log(4.5);
+
+    // const head = await page.$eval('head', (el) => el.innerHTML);
+    // const html = await page.$eval('body', (el) => el.innerHTML);
+
+    // console.log({ head });
+    // console.log({ html });
+
+    // await page.waitForSelector('.body');
+    // console.log(4.7);
+
+    // await page.waitForSelector('.sidebar-container');
+    // console.log(5);
+
+    await page.waitForSelector('.card-title-view__title');
+    console.log(5);
+
+    const name = await page.$eval(
+      '.card-title-view__title',
+      (el) => el.innerHTML,
+    );
+
+    console.log({ name });
+
+    // const element = await page.$eval('.childNameSection', (el) => el.innerHTML);
+    // console.log({ element });
+
+    await browser.close();
+
+    return 'ok';
   }
 }
