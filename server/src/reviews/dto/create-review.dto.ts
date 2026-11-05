@@ -20,4 +20,8 @@ export class CreateReviewDto {
   @IsNotEmpty()
   @IsString()
   readonly text: string;
+
+  @IsNotEmpty()
+  @IsString()
+  readonly timestamp: string;
 }

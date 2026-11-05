@@ -8,7 +8,8 @@ model User {
 
 model Entity {
   id Int @id @default(autoincrement())
-  url String @unique
+  slug String
+  office_id String
   name String?
   review_count Int
   avg_rating String
@@ -21,4 +22,5 @@ model Review {
   author String
   rating Int
   text String
+  timestamp String
 }

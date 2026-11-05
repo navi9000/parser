@@ -37,6 +37,11 @@ export class EntitiesController {
     return this.entitiesService.getByInput(search);
   }
 
+  @Get('test_pp')
+  tst() {
+    return this.entitiesService.testPuppeteer();
+  }
+
   @Get(':id')
   getById(@Param('id', ParseIntPipe) id: number) {
     return this.entitiesService.getById(id);

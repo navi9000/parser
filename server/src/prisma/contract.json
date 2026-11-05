@@ -44,6 +44,13 @@
                   "kind": "scalar"
                 }
               },
+              "office_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "review_count": {
                 "nullable": false,
                 "type": {
@@ -51,7 +58,7 @@
                   "kind": "scalar"
                 }
               },
-              "url": {
+              "slug": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -71,11 +78,14 @@
                 "name": {
                   "column": "name"
                 },
+                "office_id": {
+                  "column": "office_id"
+                },
                 "review_count": {
                   "column": "review_count"
                 },
-                "url": {
-                  "column": "url"
+                "slug": {
+                  "column": "slug"
                 }
               },
               "namespaceId": "public",
@@ -118,6 +128,13 @@
                   "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
+              },
+              "timestamp": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
@@ -154,6 +171,9 @@
                 },
                 "text": {
                   "column": "text"
+                },
+                "timestamp": {
+                  "column": "timestamp"
                 }
               },
               "namespaceId": "public",
@@ -231,12 +251,17 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "office_id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "review_count": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
                   "nullable": false
                 },
-                "url": {
+                "slug": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -249,13 +274,7 @@
                   "id"
                 ]
               },
-              "uniques": [
-                {
-                  "columns": [
-                    "url"
-                  ]
-                }
-              ]
+              "uniques": []
             },
             "review": {
               "columns": {
@@ -284,6 +303,11 @@
                   "nullable": false
                 },
                 "text": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "timestamp": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -363,7 +387,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "92d36f8333aa3f63a128013d72681af1e29e8c782cae862b9d4fb581c91ad0ac"
+    "storageHash": "ab47d4403392127be228049948a01a2836527efcc71f017ed0cf189d3fe9783c"
   },
   "execution": {
     "executionHash": "c6c68895811eac8510a3105769605e248431b77d0f5294ccf29b9aa8ce355232",

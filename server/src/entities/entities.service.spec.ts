@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EntitiesService } from './entities.service.js';
+import { YandexModule } from '../yandex/yandex.module.js';
 
 describe('EntitiesService', () => {
   let service: EntitiesService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [YandexModule],
       providers: [EntitiesService],
     }).compile();
 
