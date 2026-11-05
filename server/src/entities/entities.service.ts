@@ -10,17 +10,21 @@ import { db } from '../prisma/db.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
 import puppeteer from 'puppeteer';
 import fs from 'node:fs';
+import { YandexService } from '../yandex/yandex.service.js';
 
 @Injectable()
 export class EntitiesService {
+  constructor(private readonly yandexService: YandexService) {}
+
   async create(createEntityDto: CreateEntityDto) {
     try {
-      const { url, ...rest } = createEntityDto;
+      const { slug, office_id, ...rest } = createEntityDto;
       const name = rest?.name ?? null;
       const review_count = rest.review_count ?? 0;
       const avg_rating = rest.avg_rating ?? '0.00';
       const result = await db.orm.public.Entity.create({
-        url,
+        slug,
+        office_id,
         name,
         avg_rating,
         review_count,
@@ -42,7 +46,8 @@ export class EntitiesService {
   async getAll() {
     return await db.orm.public.Entity.select(
       'id',
-      'url',
+      'slug',
+      'office_id',
       'name',
       'avg_rating',
       'review_count',
@@ -50,7 +55,16 @@ export class EntitiesService {
   }
 
   async getByInput(input: string) {
-    const result = await db.orm.public.Entity.where({ url: input }).first();
+    const parsedInput = await this.yandexService.parsedUrlOrNull(input);
+    if (parsedInput) {
+      const { slug, office_id } = parsedInput;
+      let entity = await this.getBySlugAndOfficeId({ slug, office_id });
+      if (!entity) {
+        entity = await this.create({ slug, office_id });
+      }
+      return entity;
+    }
+    const result = await db.orm.public.Entity.where({ name: input }).first();
     if (!result) {
       throw new NotFoundException();
     }
@@ -61,6 +75,23 @@ export class EntitiesService {
     const result = await db.orm.public.Entity.where({ id }).first();
     if (!result) {
       throw new NotFoundException();
+    }
+    return { ...result };
+  }
+
+  async getBySlugAndOfficeId({
+    slug,
+    office_id,
+  }: {
+    slug: string;
+    office_id: string;
+  }) {
+    const result = await db.orm.public.Entity.where({
+      slug,
+      office_id,
+    }).first();
+    if (!result) {
+      return null;
     }
     return { ...result };
   }

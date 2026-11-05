@@ -8,8 +8,10 @@ import {
 
 export class CreateEntityDto {
   @IsString()
-  @IsNotEmpty()
-  readonly url: string;
+  readonly slug: string;
+
+  @IsString()
+  readonly office_id: string;
 
   @IsString()
   @IsOptional()

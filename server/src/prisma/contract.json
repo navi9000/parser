@@ -44,6 +44,13 @@
                   "kind": "scalar"
                 }
               },
+              "office_id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "review_count": {
                 "nullable": false,
                 "type": {
@@ -51,7 +58,7 @@
                   "kind": "scalar"
                 }
               },
-              "url": {
+              "slug": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -71,11 +78,14 @@
                 "name": {
                   "column": "name"
                 },
+                "office_id": {
+                  "column": "office_id"
+                },
                 "review_count": {
                   "column": "review_count"
                 },
-                "url": {
-                  "column": "url"
+                "slug": {
+                  "column": "slug"
                 }
               },
               "namespaceId": "public",
@@ -231,12 +241,17 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "office_id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "review_count": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
                   "nullable": false
                 },
-                "url": {
+                "slug": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -249,13 +264,7 @@
                   "id"
                 ]
               },
-              "uniques": [
-                {
-                  "columns": [
-                    "url"
-                  ]
-                }
-              ]
+              "uniques": []
             },
             "review": {
               "columns": {
@@ -363,7 +372,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "92d36f8333aa3f63a128013d72681af1e29e8c782cae862b9d4fb581c91ad0ac"
+    "storageHash": "3526920a9c95cdd70e4b50af7e5e18d1de1020e7e3bdf2acb7d67054ce578e5b"
   },
   "execution": {
     "executionHash": "c6c68895811eac8510a3105769605e248431b77d0f5294ccf29b9aa8ce355232",

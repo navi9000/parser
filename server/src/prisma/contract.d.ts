@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'92d36f8333aa3f63a128013d72681af1e29e8c782cae862b9d4fb581c91ad0ac'>;
+  StorageHashBase<'3526920a9c95cdd70e4b50af7e5e18d1de1020e7e3bdf2acb7d67054ce578e5b'>;
 export type ExecutionHash =
   ExecutionHashBase<'c6c68895811eac8510a3105769605e248431b77d0f5294ccf29b9aa8ce355232'>;
 export type ProfileHash =
@@ -244,7 +244,8 @@ export type FieldOutputTypes = {
   readonly public: {
     readonly Entity: {
       readonly id: CodecTypes['pg/int4@1']['output'];
-      readonly url: CodecTypes['pg/text@1']['output'];
+      readonly slug: CodecTypes['pg/text@1']['output'];
+      readonly office_id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'] | null;
       readonly review_count: CodecTypes['pg/int4@1']['output'];
       readonly avg_rating: CodecTypes['pg/text@1']['output'];
@@ -267,7 +268,8 @@ export type FieldInputTypes = {
   readonly public: {
     readonly Entity: {
       readonly id: CodecTypes['pg/int4@1']['input'];
-      readonly url: CodecTypes['pg/text@1']['input'];
+      readonly slug: CodecTypes['pg/text@1']['input'];
+      readonly office_id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'] | null;
       readonly review_count: CodecTypes['pg/int4@1']['input'];
       readonly avg_rating: CodecTypes['pg/text@1']['input'];
@@ -292,8 +294,9 @@ export type StorageColumnTypes = {
       readonly avg_rating: CodecTypes['pg/text@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'] | null;
+      readonly office_id: CodecTypes['pg/text@1']['output'];
       readonly review_count: CodecTypes['pg/int4@1']['output'];
-      readonly url: CodecTypes['pg/text@1']['output'];
+      readonly slug: CodecTypes['pg/text@1']['output'];
     };
     readonly review: {
       readonly author: CodecTypes['pg/text@1']['output'];
@@ -315,8 +318,9 @@ export type StorageColumnInputTypes = {
       readonly avg_rating: CodecTypes['pg/text@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'] | null;
+      readonly office_id: CodecTypes['pg/text@1']['input'];
       readonly review_count: CodecTypes['pg/int4@1']['input'];
-      readonly url: CodecTypes['pg/text@1']['input'];
+      readonly slug: CodecTypes['pg/text@1']['input'];
     };
     readonly review: {
       readonly author: CodecTypes['pg/text@1']['input'];
@@ -332,41 +336,6 @@ export type StorageColumnInputTypes = {
     };
   };
 };
-
-export namespace Models {
-  export type public_User = {
-    id: CodecTypes['pg/uuid@1']['output'];
-    login: CodecTypes['pg/text@1']['output'];
-    password: CodecTypes['pg/text@1']['output'];
-    readonly [RelationKeys]?: never;
-  };
-  export type public_Entity = {
-    id: CodecTypes['pg/int4@1']['output'];
-    url: CodecTypes['pg/text@1']['output'];
-    name: CodecTypes['pg/text@1']['output'] | null;
-    review_count: CodecTypes['pg/int4@1']['output'];
-    avg_rating: CodecTypes['pg/text@1']['output'];
-    readonly [RelationKeys]?: never;
-  };
-  export type public_Review = {
-    id: CodecTypes['pg/int4@1']['output'];
-    entity_id: CodecTypes['pg/int4@1']['output'];
-    author: CodecTypes['pg/text@1']['output'];
-    rating: CodecTypes['pg/int4@1']['output'];
-    text: CodecTypes['pg/text@1']['output'];
-    entity: public_Entity;
-    readonly [RelationKeys]?: 'entity';
-  };
-}
-
-export declare const models: {
-  public: {
-    User: Models.public_User;
-    Entity: Models.public_Entity;
-    Review: Models.public_Review;
-  };
-};
-
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
@@ -396,7 +365,12 @@ type ContractBase = Omit<
                     readonly expression: 'autoincrement()';
                   };
                 };
-                readonly url: {
+                readonly slug: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly office_id: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
@@ -418,7 +392,7 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [{ readonly columns: readonly ['url'] }];
+              uniques: readonly [];
               indexes: readonly [];
               foreignKeys: readonly [];
             };
@@ -527,7 +501,11 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
-              readonly url: {
+              readonly slug: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly office_id: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
@@ -550,7 +528,8 @@ type ContractBase = Omit<
               readonly namespaceId: 'public';
               readonly fields: {
                 readonly id: { readonly column: 'id' };
-                readonly url: { readonly column: 'url' };
+                readonly slug: { readonly column: 'slug' };
+                readonly office_id: { readonly column: 'office_id' };
                 readonly name: { readonly column: 'name' };
                 readonly review_count: { readonly column: 'review_count' };
                 readonly avg_rating: { readonly column: 'avg_rating' };
