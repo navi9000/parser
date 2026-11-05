@@ -37,8 +37,8 @@ export class EntitiesController {
     return this.entitiesService.getByInput(search);
   }
 
-  @Get('test_pup')
-  testPuppeteer() {
+  @Get('test_pp')
+  tst() {
     return this.entitiesService.testPuppeteer();
   }
 

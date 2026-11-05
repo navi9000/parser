@@ -24,12 +24,13 @@ export class ReviewsService {
 
   async create(entity_id: number, createReviewDto: CreateReviewDto) {
     try {
-      const { author, rating, text } = createReviewDto;
+      const { author, rating, text, timestamp } = createReviewDto;
       const result = await db.orm.public.Review.create({
         author,
         rating,
         text,
         entity_id,
+        timestamp,
       });
 
       const newRating = result.rating;

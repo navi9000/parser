@@ -22,4 +22,5 @@ model Review {
   author String
   rating Int
   text String
+  timestamp String
 }

@@ -29,6 +29,8 @@ export class EntitiesService {
         avg_rating,
         review_count,
       });
+      const ynd = await this.yandexService.parsePage({ slug, office_id });
+
       return { ...result };
     } catch (err) {
       if (
@@ -55,7 +57,7 @@ export class EntitiesService {
   }
 
   async getByInput(input: string) {
-    const parsedInput = await this.yandexService.parsedUrlOrNull(input);
+    const parsedInput = this.yandexService.parsedUrlOrNull(input);
     if (parsedInput) {
       const { slug, office_id } = parsedInput;
       let entity = await this.getBySlugAndOfficeId({ slug, office_id });
@@ -135,6 +137,13 @@ export class EntitiesService {
   }
 
   async testPuppeteer() {
+    return this.yandexService.parsePage({
+      slug: 'itsports',
+      office_id: '81786207255',
+    });
+  }
+
+  async testPuppeteer_v0() {
     console.log(1);
     const browser = await puppeteer.launch();
     console.log(2);
