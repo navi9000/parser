@@ -14,21 +14,18 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from "vuetify/lib/composables/router.mjs"
+import { ref } from "vue"
+import { useRouter } from "vue-router"
 
-const search = defineModel("search")
+const search = ref<string | null>("")
 const router = useRouter()
 
-const submit = () => {
-  if (!router) {
-    return
-  }
-
-  let value = search.value ?? ""
+function submit() {
+  const value = (search.value ?? "").trim()
   if (value) {
-    router.push(`/?search=${value}`)
+    void router.push({ path: "/", query: { search: value } })
   } else {
-    router.push("/")
+    void router.push({ path: "/", query: {} })
   }
 }
 </script>

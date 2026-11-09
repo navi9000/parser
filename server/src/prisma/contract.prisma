@@ -13,6 +13,9 @@ model Entity {
   name String?
   review_count Int
   avg_rating String
+  last_updated_at String?
+
+  @@unique([slug, office_id])
 }
 
 model Review {
@@ -23,4 +26,6 @@ model Review {
   rating Int
   text String
   timestamp String
+
+  @@index([entity_id, timestamp])
 }

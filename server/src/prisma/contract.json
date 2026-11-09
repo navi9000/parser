@@ -37,6 +37,13 @@
                   "kind": "scalar"
                 }
               },
+              "last_updated_at": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "name": {
                 "nullable": true,
                 "type": {
@@ -74,6 +81,9 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "last_updated_at": {
+                  "column": "last_updated_at"
                 },
                 "name": {
                   "column": "name"
@@ -246,6 +256,11 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "last_updated_at": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "name": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -274,7 +289,14 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "slug",
+                    "office_id"
+                  ]
+                }
+              ]
             },
             "review": {
               "columns": {
@@ -339,6 +361,15 @@
                   "name": "review_entity_id_idx_5948f79a",
                   "prefix": "review_entity_id_idx",
                   "unique": false
+                },
+                {
+                  "columns": [
+                    "entity_id",
+                    "timestamp"
+                  ],
+                  "name": "review_entity_id_timestamp_idx_246e91b3",
+                  "prefix": "review_entity_id_timestamp_idx",
+                  "unique": false
                 }
               ],
               "primaryKey": {
@@ -387,7 +418,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ab47d4403392127be228049948a01a2836527efcc71f017ed0cf189d3fe9783c"
+    "storageHash": "d2cc638c2f013d16ecf5157bfa422e1e904f81600ea6653cd28a11e547bdafc3"
   },
   "execution": {
     "executionHash": "c6c68895811eac8510a3105769605e248431b77d0f5294ccf29b9aa8ce355232",

@@ -1,2 +1,13 @@
-export type { Entity } from "./model"
-export { searchForEntity } from "./api"
+export type {
+  CompanySummary,
+  Entity,
+  EntitySearchResult,
+  ScrapeJobStatus,
+} from "./model"
+export {
+  fetchCompany,
+  fetchEntity,
+  fetchScrapeJobStatus,
+  requestEntityRefresh,
+  searchForEntity,
+} from "./api"

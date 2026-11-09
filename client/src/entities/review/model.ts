@@ -4,4 +4,5 @@ export type Review = {
   author: string
   rating: number
   text: string
+  timestamp: string
 }
