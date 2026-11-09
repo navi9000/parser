@@ -7,7 +7,7 @@
         :offices="offices"
         :selected-office-id="selectedOfficeId"
         :scope="scope"
-        :loading="searchLoading || companyLoading"
+        :loading="searchLoading || companyLoading || reviewsLoading"
         :searching="searchState === 'pending'"
         :error="searchError"
         :job-error="jobError"
@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import CompanySearch from "./company-search.vue"
 import CompanyInfo from "./company-info.vue"
 import CommentList from "./comment-list.vue"
@@ -44,6 +44,7 @@ import {
 import { ApiError } from "../../../shared/api"
 
 const route = useRoute()
+const router = useRouter()
 const offices = ref<Entity[]>([])
 const selectedOfficeId = ref<number | null>(null)
 const scope = ref<"office" | "company">("office")
@@ -89,6 +90,22 @@ function setOffices(nextOffices: Entity[], preferredId?: number) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "An unexpected error occurred"
+}
+
+function normalizeOfficeSearch(entity: Entity) {
+  if (!entity.name) return false
+  if (
+    route.query.search === entity.name &&
+    route.query.office_id === entity.office_id
+  ) {
+    return false
+  }
+
+  void router.replace({
+    path: "/",
+    query: { search: entity.name, office_id: entity.office_id },
+  })
+  return true
 }
 
 async function loadSelectedView(currentOperation = operation) {
@@ -167,7 +184,11 @@ async function loadSelectedView(currentOperation = operation) {
   }
 }
 
-function startPolling(jobId: string, entityId: number) {
+function startPolling(
+  jobId: string,
+  entityId: number,
+  normalizeSearch = false,
+) {
   stopPolling()
   const generation = pollGeneration
   jobError.value = null
@@ -187,6 +208,7 @@ function startPolling(jobId: string, entityId: number) {
         searchState.value = "ready"
         refreshing.value = false
         jobError.value = null
+        if (normalizeSearch && normalizeOfficeSearch(entity)) return
         await loadSelectedView()
       } else if (status.status === "failed") {
         stopPolling()
@@ -210,7 +232,7 @@ function startPolling(jobId: string, entityId: number) {
   }, 2000)
 }
 
-async function loadSearch(input: string) {
+async function loadSearch(input: string, officeId?: string) {
   const currentOperation = ++operation
   stopPolling()
   offices.value = []
@@ -221,6 +243,9 @@ async function loadSearch(input: string) {
   searchError.value = null
   jobError.value = null
   refreshing.value = false
+  searchLoading.value = false
+  companyLoading.value = false
+  reviewsLoading.value = false
 
   if (!input) {
     searchState.value = "idle"
@@ -235,8 +260,11 @@ async function loadSearch(input: string) {
     if (currentOperation !== operation) return
 
     if (result.kind === "matches") {
-      scope.value = "company"
-      setOffices(result.offices)
+      const requestedOffice = result.offices.find(
+        (office) => office.office_id === officeId,
+      )
+      scope.value = requestedOffice ? "office" : "company"
+      setOffices(result.offices, requestedOffice?.id)
       searchState.value = "ready"
       await loadSelectedView(currentOperation)
     } else {
@@ -245,9 +273,10 @@ async function loadSearch(input: string) {
         searchState.value = "pending"
         refreshing.value = true
         void loadSelectedView(currentOperation)
-        startPolling(result.jobId, result.entity.id)
+        startPolling(result.jobId, result.entity.id, true)
       } else {
         searchState.value = "ready"
+        if (normalizeOfficeSearch(result.entity)) return
         await loadSelectedView(currentOperation)
       }
     }
@@ -264,15 +293,37 @@ async function loadSearch(input: string) {
 }
 
 function selectOffice(officeId: number) {
+  if (reviewsLoading.value || companyLoading.value) return
+  const office = offices.value.find((item) => item.id === officeId)
+  if (!office) return
+
   selectedOfficeId.value = officeId
   scope.value = "office"
   searchError.value = null
+  if (route.query.office_id !== office.office_id) {
+    void router.replace({
+      path: "/",
+      query: { ...route.query, office_id: office.office_id },
+    })
+    return
+  }
   void loadSelectedView()
 }
 
 function toggleView() {
-  scope.value = scope.value === "office" ? "company" : "office"
+  if (reviewsLoading.value || companyLoading.value) return
+  const nextScope = scope.value === "office" ? "company" : "office"
+  scope.value = nextScope
   searchError.value = null
+  const office = selectedOffice.value
+  const officeId = nextScope === "office" ? office?.office_id : undefined
+  if (route.query.office_id !== officeId) {
+    void router.replace({
+      path: "/",
+      query: { ...route.query, office_id: officeId },
+    })
+    return
+  }
   void loadSelectedView()
 }
 
@@ -290,8 +341,12 @@ async function refreshSelectedOffice() {
 }
 
 watch(
-  () => route.query.search,
-  (search) => void loadSearch(typeof search === "string" ? search.trim() : ""),
+  () => [route.query.search, route.query.office_id],
+  ([search, officeId]) =>
+    void loadSearch(
+      typeof search === "string" ? search.trim() : "",
+      typeof officeId === "string" ? officeId.trim() : undefined,
+    ),
   { immediate: true },
 )
 

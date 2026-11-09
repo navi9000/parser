@@ -1,80 +1,97 @@
 <template>
-  <div
-    v-if="loading && !company"
-    class="company-info d-flex justify-center align-center"
-  >
-    <v-progress-circular indeterminate />
-  </div>
-  <v-card class="company-info" v-else-if="company">
-    <div class="company-info__header">
-      <v-card-title class="company-info__title">
-        {{ company.name ?? company.slug }}
-      </v-card-title>
-      <v-card-subtitle class="company-info__subtitle">
-        {{ company.slug }}
-        <template v-if="'office_id' in company"> / {{ company.office_id }}</template>
-      </v-card-subtitle>
+  <v-fade-transition mode="out-in">
+    <div
+      v-if="loading && !company"
+      key="loading"
+      class="company-info d-flex justify-center align-center"
+    >
+      <v-progress-circular indeterminate />
     </div>
-    <v-card-text class="company-info__details">
-      <div class="company-info__stats">
-        <p><strong>Отзывов: </strong>{{ company.review_count }}</p>
-        <p><strong>Средняя оценка: </strong>{{ company.avg_rating }}</p>
-        <p v-if="'office_count' in company">
-          <strong>Офисов: </strong>{{ company.office_count }}
-        </p>
-        <p v-else-if="company.last_updated_at" class="company-info__updated">
-          <strong>Обновлено: </strong>
-          {{ new Date(company.last_updated_at).toLocaleString() }}
-        </p>
-      </div>
-      <p v-if="searching" class="company-info__status">Загрузка данных из Яндекса…</p>
-      <p v-else-if="refreshing" class="company-info__status">Обновление данных…</p>
-      <v-alert v-if="error" class="company-info__alert" type="error" density="compact">
-        {{ error }}
-      </v-alert>
-      <v-alert v-if="jobError" class="company-info__alert" type="error" density="compact">
-        {{ jobError }}
-      </v-alert>
-    </v-card-text>
-    <v-card-actions class="company-info__actions">
-      <v-select
-        v-if="offices.length > 1"
-        class="company-info__office-select"
-        :model-value="selectedOfficeId"
-        :items="offices"
-        :item-title="officeLabel"
-        item-value="id"
-        label="Офис"
-        density="compact"
-        hide-details
-        @update:model-value="$emit('select-office', $event)"
+    <v-card
+      v-else-if="company"
+      :key="`company-${JSON.stringify(company)}`"
+      class="company-info"
+      :class="{ 'company-info--updating': loading || refreshing }"
+    >
+      <v-progress-linear
+        v-if="loading || refreshing"
+        class="company-info__progress"
+        color="primary"
+        indeterminate
       />
-      <div class="company-info__buttons">
-        <v-btn
-          v-if="offices.length > 1"
-          size="small"
-          @click="$emit('toggle-view')"
-        >
-          {{ scope === "office" ? "Показать компанию" : "Показать офис" }}
-        </v-btn>
-        <v-btn
-          size="small"
-          :disabled="!selectedOfficeId || searching"
-          :loading="refreshing"
-          @click="$emit('refresh')"
-        >
-          Обновить данные
-        </v-btn>
+      <div class="company-info__header">
+        <v-card-title class="company-info__title">
+          {{ company.name ?? company.slug }}
+        </v-card-title>
+        <v-card-subtitle class="company-info__subtitle">
+          {{ company.slug }}
+          <template v-if="'office_id' in company"> / {{ company.office_id }}</template>
+        </v-card-subtitle>
       </div>
-    </v-card-actions>
-  </v-card>
-  <v-card class="company-info" v-else-if="error">
-    <v-card-title>Не найдено</v-card-title>
-    <v-card-text>{{ error }}</v-card-text>
-  </v-card>
-  <div class="company-info" v-else>
-    <v-card-title>Введите наименование компании или URL</v-card-title>
-  </div>
+      <v-card-text class="company-info__details">
+        <div class="company-info__stats">
+          <p><strong>Отзывов: </strong>{{ company.review_count }}</p>
+          <p><strong>Средняя оценка: </strong>{{ company.avg_rating }}</p>
+          <p v-if="'office_count' in company">
+            <strong>Офисов: </strong>{{ company.office_count }}
+          </p>
+          <p v-else-if="company.last_updated_at" class="company-info__updated">
+            <strong>Обновлено: </strong>
+            {{ new Date(company.last_updated_at).toLocaleString() }}
+          </p>
+        </div>
+        <p v-if="searching" class="company-info__status">Загрузка данных из Яндекса…</p>
+        <p v-else-if="refreshing" class="company-info__status">Обновление данных…</p>
+        <v-alert v-if="error" class="company-info__alert" type="error" density="compact">
+          {{ error }}
+        </v-alert>
+        <v-alert v-if="jobError" class="company-info__alert" type="error" density="compact">
+          {{ jobError }}
+        </v-alert>
+      </v-card-text>
+      <v-card-actions class="company-info__actions">
+        <v-select
+          v-if="offices.length > 1"
+          class="company-info__office-select"
+          :model-value="selectedOfficeId"
+          :items="offices"
+          :item-title="officeLabel"
+          item-value="id"
+          label="Офис"
+          density="compact"
+          hide-details
+          :disabled="loading"
+          @update:model-value="$emit('select-office', $event)"
+        />
+        <div class="company-info__buttons">
+          <v-btn
+            v-if="offices.length > 1"
+            size="small"
+            :loading="loading"
+            :disabled="loading"
+            @click="$emit('toggle-view')"
+          >
+            {{ scope === "office" ? "Показать компанию" : "Показать офис" }}
+          </v-btn>
+          <v-btn
+            size="small"
+            :disabled="!selectedOfficeId || searching || loading"
+            :loading="refreshing"
+            @click="$emit('refresh')"
+          >
+            Обновить данные
+          </v-btn>
+        </div>
+      </v-card-actions>
+    </v-card>
+    <v-card v-else-if="error" key="error" class="company-info">
+      <v-card-title>Не найдено</v-card-title>
+      <v-card-text>{{ error }}</v-card-text>
+    </v-card>
+    <div v-else key="empty" class="company-info">
+      <v-card-title>Введите наименование компании или URL</v-card-title>
+    </div>
+  </v-fade-transition>
 </template>
 
 <script setup lang="ts">
@@ -111,9 +128,21 @@ function officeLabel(office: Entity) {
 }
 
 .v-card.company-info {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  transition: opacity 180ms ease;
+}
+
+.company-info--updating {
+  opacity: 0.72;
+}
+
+.company-info__progress {
+  position: absolute;
+  z-index: 1;
+  top: 0;
 }
 
 .company-info__header {
