@@ -235,6 +235,7 @@ async function loadSearch(input: string) {
     if (currentOperation !== operation) return
 
     if (result.kind === "matches") {
+      scope.value = "company"
       setOffices(result.offices)
       searchState.value = "ready"
       await loadSelectedView(currentOperation)
