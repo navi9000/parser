@@ -29,10 +29,9 @@ import CompanyInfo from "./company-info.vue"
 import CommentList from "./comment-list.vue"
 import {
   fetchCompany,
-  fetchEntity,
-  fetchScrapeJobStatus,
   requestEntityRefresh,
   searchForEntity,
+  waitForScrapeJob,
   type CompanySummary,
   type Entity,
 } from "../../../entities/entity"
@@ -41,7 +40,6 @@ import {
   fetchReviews,
   type Review,
 } from "../../../entities/review"
-import { ApiError } from "../../../shared/api"
 
 const route = useRoute()
 const router = useRouter()
@@ -67,17 +65,14 @@ const displayCompany = computed(() =>
 
 let operation = 0
 let viewOperation = 0
-let pollTimer: number | undefined
-let polling = false
-let pollGeneration = 0
+let scrapeStreamController: AbortController | undefined
+let scrapeStreamGeneration = 0
+let skipNormalizedSearch: { search: string; officeId: string } | null = null
 
-function stopPolling() {
-  pollGeneration += 1
-  if (pollTimer !== undefined) {
-    window.clearInterval(pollTimer)
-    pollTimer = undefined
-  }
-  polling = false
+function stopScrapeStream() {
+  scrapeStreamGeneration += 1
+  scrapeStreamController?.abort()
+  scrapeStreamController = undefined
 }
 
 function setOffices(nextOffices: Entity[], preferredId?: number) {
@@ -93,19 +88,22 @@ function errorMessage(error: unknown) {
 }
 
 function normalizeOfficeSearch(entity: Entity) {
-  if (!entity.name) return false
+  if (!entity.name) return
   if (
     route.query.search === entity.name &&
     route.query.office_id === entity.office_id
   ) {
-    return false
+    return
   }
 
+  skipNormalizedSearch = {
+    search: entity.name,
+    officeId: entity.office_id,
+  }
   void router.replace({
     path: "/",
     query: { search: entity.name, office_id: entity.office_id },
   })
-  return true
 }
 
 async function loadSelectedView(currentOperation = operation) {
@@ -184,57 +182,59 @@ async function loadSelectedView(currentOperation = operation) {
   }
 }
 
-function startPolling(
+async function waitForScrapeCompletion(
   jobId: string,
-  entityId: number,
-  normalizeSearch = false,
+  currentOperation: number,
 ) {
-  stopPolling()
-  const generation = pollGeneration
+  stopScrapeStream()
+  const generation = scrapeStreamGeneration
+  const controller = new AbortController()
+  scrapeStreamController = controller
   jobError.value = null
-  pollTimer = window.setInterval(async () => {
-    if (polling) return
-    polling = true
-    try {
-      const status = await fetchScrapeJobStatus(jobId)
-      if (generation !== pollGeneration) return
-      if (status.status === "completed") {
-        const entity = await fetchEntity(entityId)
-        if (generation !== pollGeneration) return
-        stopPolling()
-        offices.value = offices.value.map((office) =>
-          office.id === entity.id ? entity : office,
-        )
-        searchState.value = "ready"
-        refreshing.value = false
-        jobError.value = null
-        if (normalizeSearch && normalizeOfficeSearch(entity)) return
-        await loadSelectedView()
-      } else if (status.status === "failed") {
-        stopPolling()
-        searchState.value = "ready"
-        refreshing.value = false
-        jobError.value = status.failedReason ?? "The scrape job failed"
-      }
-    } catch (error) {
-      if (generation !== pollGeneration) return
-      if (error instanceof ApiError && error.status === 404) {
-        stopPolling()
-        searchState.value = "ready"
-        refreshing.value = false
-      }
-      jobError.value = `Unable to check scrape status: ${errorMessage(error)}`
-    } finally {
-      if (generation === pollGeneration) {
-        polling = false
-      }
+  try {
+    const event = await waitForScrapeJob(jobId, controller.signal)
+    if (
+      generation !== scrapeStreamGeneration ||
+      currentOperation !== operation
+    ) {
+      return
     }
-  }, 2000)
+
+    searchState.value = "ready"
+    refreshing.value = false
+    if (event.status === "completed") {
+      offices.value = offices.value.map((office) =>
+        office.id === event.entity.id ? event.entity : office,
+      )
+      jobError.value = null
+      normalizeOfficeSearch(event.entity)
+      await loadSelectedView(currentOperation)
+    } else {
+      jobError.value = event.failedReason ?? "The scrape job failed"
+    }
+  } catch (error) {
+    if (
+      generation === scrapeStreamGeneration &&
+      currentOperation === operation &&
+      !controller.signal.aborted
+    ) {
+      searchState.value = "ready"
+      refreshing.value = false
+      jobError.value = `Unable to wait for scrape completion: ${errorMessage(error)}`
+    }
+  } finally {
+    if (
+      generation === scrapeStreamGeneration &&
+      scrapeStreamController === controller
+    ) {
+      scrapeStreamController = undefined
+    }
+  }
 }
 
 async function loadSearch(input: string, officeId?: string) {
   const currentOperation = ++operation
-  stopPolling()
+  stopScrapeStream()
   offices.value = []
   selectedOfficeId.value = null
   scope.value = "office"
@@ -272,11 +272,13 @@ async function loadSearch(input: string, officeId?: string) {
       if (result.kind === "pending") {
         searchState.value = "pending"
         refreshing.value = true
-        void loadSelectedView(currentOperation)
-        startPolling(result.jobId, result.entity.id, true)
+        void waitForScrapeCompletion(
+          result.jobId,
+          currentOperation,
+        )
       } else {
         searchState.value = "ready"
-        if (normalizeOfficeSearch(result.entity)) return
+        normalizeOfficeSearch(result.entity)
         await loadSelectedView(currentOperation)
       }
     }
@@ -330,27 +332,40 @@ function toggleView() {
 async function refreshSelectedOffice() {
   const office = selectedOffice.value
   if (!office) return
+  const currentOperation = operation
 
   try {
     const { jobId } = await requestEntityRefresh(office.id)
+    if (currentOperation !== operation) return
     refreshing.value = true
-    startPolling(jobId, office.id)
+    void waitForScrapeCompletion(jobId, currentOperation)
   } catch (error) {
-    jobError.value = errorMessage(error)
+    if (currentOperation === operation) {
+      jobError.value = errorMessage(error)
+    }
   }
 }
 
 watch(
   () => [route.query.search, route.query.office_id],
-  ([search, officeId]) =>
-    void loadSearch(
-      typeof search === "string" ? search.trim() : "",
-      typeof officeId === "string" ? officeId.trim() : undefined,
-    ),
+  ([search, officeId]) => {
+    const nextSearch = typeof search === "string" ? search.trim() : ""
+    const nextOfficeId =
+      typeof officeId === "string" ? officeId.trim() : ""
+    if (
+      skipNormalizedSearch?.search === nextSearch &&
+      skipNormalizedSearch.officeId === nextOfficeId
+    ) {
+      skipNormalizedSearch = null
+      return
+    }
+    skipNormalizedSearch = null
+    void loadSearch(nextSearch, nextOfficeId || undefined)
+  },
   { immediate: true },
 )
 
-onBeforeUnmount(stopPolling)
+onBeforeUnmount(stopScrapeStream)
 </script>
 
 <style scoped>

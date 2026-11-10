@@ -5,8 +5,9 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { Job, Queue, Worker } from 'bullmq';
+import { Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { randomUUID } from 'node:crypto';
+import { Observable, type Observer } from 'rxjs';
 import { db } from '../prisma/db.js';
 import {
   REFRESH_INTERVAL_MS,
@@ -28,6 +29,10 @@ interface ScrapeJobResult {
   entityId: number;
 }
 
+export type ScrapeJobEvent =
+  | { status: 'completed'; entityId: number }
+  | { status: 'failed'; failedReason: string | null };
+
 @Injectable()
 export class ScrapingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ScrapingService.name);
@@ -40,6 +45,11 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     string
   >;
   private worker!: Worker<ScrapeJobData, ScrapeJobResult>;
+  private queueEvents!: QueueEvents;
+  private readonly jobObservers = new Map<
+    string,
+    Set<Observer<ScrapeJobEvent>>
+  >();
 
   constructor(private readonly yandexService: YandexService) {}
 
@@ -66,6 +76,17 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
       (job) => this.scrapeOffice(job),
       { connection, concurrency: 1 },
     );
+    this.queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+    this.queueEvents.on('completed', ({ jobId }) => {
+      void this.publishTerminalJobEvent(jobId, 'completed');
+    });
+    this.queueEvents.on('failed', ({ jobId }) => {
+      void this.publishTerminalJobEvent(jobId, 'failed');
+    });
+    this.queueEvents.on('error', (error: Error) => {
+      this.logger.error('Scraping queue events error', error.stack);
+      this.failAllJobObservers(error);
+    });
     this.worker.on('completed', (job) => {
       void this.scheduleNextRefresh(job.data.entityId).catch((error: unknown) =>
         this.logger.error(
@@ -89,13 +110,18 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     await Promise.all([
       this.queue.waitUntilReady(),
       this.worker.waitUntilReady(),
+      this.queueEvents.waitUntilReady(),
     ]);
     await this.restoreRefreshJobs();
   }
 
   async onModuleDestroy() {
-    if (this.worker && this.queue) {
-      await Promise.all([this.worker.close(), this.queue.close()]);
+    if (this.worker && this.queue && this.queueEvents) {
+      await Promise.all([
+        this.worker.close(),
+        this.queue.close(),
+        this.queueEvents.close(),
+      ]);
     }
   }
 
@@ -116,6 +142,97 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
       progress: job.progress,
       failedReason: job.failedReason || null,
     };
+  }
+
+  watchJob(jobId: string): Observable<ScrapeJobEvent> {
+    return new Observable((observer) => {
+      const observers = this.jobObservers.get(jobId) ?? new Set();
+      observers.add(observer);
+      this.jobObservers.set(jobId, observers);
+
+      void this.getTerminalJobEvent(jobId)
+        .then((event) => {
+          if (event) {
+            this.publishJobEvent(jobId, event);
+          }
+        })
+        .catch((error: unknown) => this.failJobObservers(jobId, error));
+
+      return () => {
+        const currentObservers = this.jobObservers.get(jobId);
+        currentObservers?.delete(observer);
+        if (currentObservers?.size === 0) {
+          this.jobObservers.delete(jobId);
+        }
+      };
+    });
+  }
+
+  private async publishTerminalJobEvent(
+    jobId: string,
+    status: 'completed' | 'failed',
+  ) {
+    if (!this.jobObservers.has(jobId)) {
+      return;
+    }
+
+    try {
+      const event = await this.getTerminalJobEvent(jobId);
+      if (event?.status === status) {
+        this.publishJobEvent(jobId, event);
+      }
+    } catch (error) {
+      this.failJobObservers(jobId, error);
+    }
+  }
+
+  private async getTerminalJobEvent(
+    jobId: string,
+  ): Promise<ScrapeJobEvent | null> {
+    const job = await this.queue.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException('Scrape job not found');
+    }
+
+    const status = await job.getState();
+    if (status === 'completed') {
+      return { status, entityId: job.data.entityId };
+    }
+    if (status === 'failed') {
+      return { status, failedReason: job.failedReason || null };
+    }
+    return null;
+  }
+
+  private publishJobEvent(jobId: string, event: ScrapeJobEvent) {
+    const observers = this.jobObservers.get(jobId);
+    if (!observers) {
+      return;
+    }
+
+    this.jobObservers.delete(jobId);
+    for (const observer of observers) {
+      observer.next(event);
+      observer.complete();
+    }
+  }
+
+  private failJobObservers(jobId: string, error: unknown) {
+    const observers = this.jobObservers.get(jobId);
+    if (!observers) {
+      return;
+    }
+
+    this.jobObservers.delete(jobId);
+    for (const observer of observers) {
+      observer.error(error);
+    }
+  }
+
+  private failAllJobObservers(error: unknown) {
+    for (const jobId of this.jobObservers.keys()) {
+      this.failJobObservers(jobId, error);
+    }
   }
 
   private createRedisOptions(): { url: string; maxRetriesPerRequest: null } {

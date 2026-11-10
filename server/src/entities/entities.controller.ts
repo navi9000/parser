@@ -9,7 +9,9 @@ import {
   Post,
   Put,
   Query,
+  Sse,
 } from '@nestjs/common';
+import { interval, map, merge, shareReplay, takeUntil } from 'rxjs';
 import { EntitiesService } from './entities.service.js';
 import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
@@ -60,6 +62,19 @@ export class EntitiesController {
   @Get('jobs/:jobId')
   getScrapeJobStatus(@Param('jobId') jobId: string): Promise<ScrapeJobStatus> {
     return this.entitiesService.getScrapeJobStatus(jobId);
+  }
+
+  @Sse('jobs/:jobId/events')
+  watchScrapeJob(@Param('jobId') jobId: string) {
+    const completionEvents = this.entitiesService.watchScrapeJob(jobId).pipe(
+      map((data) => ({ data })),
+      shareReplay({ bufferSize: 1, refCount: true }),
+    );
+    const heartbeats = interval(15_000).pipe(
+      map(() => ({ type: 'heartbeat', data: '' })),
+      takeUntil(completionEvents),
+    );
+    return merge(completionEvents, heartbeats);
   }
 
   @Get(':id')

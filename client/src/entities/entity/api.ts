@@ -1,8 +1,9 @@
-import { request } from "../../shared/api"
+import { request, requestEvent } from "../../shared/api"
 import type {
   CompanySummary,
   Entity,
   EntitySearchResult,
+  ScrapeCompletionEvent,
   ScrapeJobStatus,
 } from "./model"
 
@@ -29,5 +30,15 @@ export async function requestEntityRefresh(entityId: number) {
 export async function fetchScrapeJobStatus(jobId: string) {
   return await request<ScrapeJobStatus>(
     `/entities/jobs/${encodeURIComponent(jobId)}`,
+  )
+}
+
+export async function waitForScrapeJob(
+  jobId: string,
+  signal: AbortSignal,
+) {
+  return await requestEvent<ScrapeCompletionEvent>(
+    `/entities/jobs/${encodeURIComponent(jobId)}/events`,
+    signal,
   )
 }
