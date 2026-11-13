@@ -68,65 +68,40 @@ export async function requestEvent<T>(
   path: string,
   signal: AbortSignal,
 ): Promise<T> {
-  const token = localStorage.getItem(TOKEN_STORAGE_NAME)
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      Accept: "text/event-stream",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    signal,
-  })
+  return await new Promise<T>((resolve, reject) => {
+    const eventSource = new EventSource(`${API_BASE_URL}${path}`)
 
-  if (!response.ok) {
-    let body: unknown
-    try {
-      body = await response.json()
-    } catch {
-      body = undefined
+    function cleanup() {
+      eventSource.onmessage = null
+      eventSource.onerror = null
+      eventSource.close()
+      signal.removeEventListener("abort", onAbort)
     }
 
-    if (response.status === 401) {
-      localStorage.removeItem(TOKEN_STORAGE_NAME)
-      window.dispatchEvent(new Event("auth:unauthorized"))
+    function onAbort() {
+      cleanup()
+      reject(new DOMException("The operation was aborted", "AbortError"))
     }
-    const message =
-      typeof body === "object" && body !== null && "message" in body
-        ? String(body.message)
-        : "Request failed"
-    throw new ApiError(message, response.status, getErrors(body))
-  }
 
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error("The event stream response has no body")
-  }
-
-  const decoder = new TextDecoder()
-  let buffer = ""
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-
-      let separator = buffer.match(/\r?\n\r?\n/)
-      while (separator?.index !== undefined) {
-        const event = buffer.slice(0, separator.index)
-        buffer = buffer.slice(separator.index + separator[0].length)
-        const data = event
-          .split(/\r?\n/)
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n")
-        if (data) {
-          return JSON.parse(data) as T
-        }
-        separator = buffer.match(/\r?\n\r?\n/)
+    eventSource.onmessage = (event) => {
+      cleanup()
+      try {
+        resolve(JSON.parse(event.data) as T)
+      } catch (error) {
+        reject(error)
       }
     }
-  } finally {
-    reader.releaseLock()
-  }
 
-  throw new Error("The event stream ended before a result was received")
+    eventSource.onerror = () => {
+      cleanup()
+      reject(new Error("The event stream connection failed"))
+    }
+
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+
+    signal.addEventListener("abort", onAbort, { once: true })
+  })
 }
