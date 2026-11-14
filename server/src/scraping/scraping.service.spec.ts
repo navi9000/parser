@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { firstValueFrom } from 'rxjs';
+import { SCRAPING_QUEUE_NAME } from './scraping.constants.js';
 import { ScrapingService } from './scraping.service.js';
 import { YandexService } from '../yandex/yandex.service.js';
 
@@ -11,6 +13,7 @@ describe('ScrapingService', () => {
     module = await Test.createTestingModule({
       providers: [
         ScrapingService,
+        { provide: getQueueToken(SCRAPING_QUEUE_NAME), useValue: {} },
         { provide: YandexService, useValue: { parsePage: vi.fn() } },
       ],
     }).compile();

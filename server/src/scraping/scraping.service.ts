@@ -1,11 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
-import { Job, Queue, QueueEvents, Worker } from 'bullmq';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { randomUUID } from 'node:crypto';
 import { Observable, type Observer } from 'rxjs';
 import { db } from '../prisma/db.js';
@@ -16,16 +11,14 @@ import {
   selectNewReviews,
   updateReviewStats,
 } from './scraping.utils.js';
+import { SCRAPING_QUEUE_NAME } from './scraping.constants.js';
 import { YandexService } from '../yandex/yandex.service.js';
 
-const QUEUE_NAME = 'entity-scrapes';
-const MAX_SCRAPE_RETRIES = 3;
-
-interface ScrapeJobData {
+export interface ScrapeJobData {
   entityId: number;
 }
 
-interface ScrapeJobResult {
+export interface ScrapeJobResult {
   entityId: number;
 }
 
@@ -34,95 +27,21 @@ export type ScrapeJobEvent =
   | { status: 'failed'; failedReason: string | null };
 
 @Injectable()
-export class ScrapingService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ScrapingService.name);
-  private queue!: Queue<
-    ScrapeJobData,
-    ScrapeJobResult,
-    string,
-    ScrapeJobData,
-    ScrapeJobResult,
-    string
-  >;
-  private worker!: Worker<ScrapeJobData, ScrapeJobResult>;
-  private queueEvents!: QueueEvents;
+export class ScrapingService implements OnModuleInit {
   private readonly jobObservers = new Map<
     string,
     Set<Observer<ScrapeJobEvent>>
   >();
 
-  constructor(private readonly yandexService: YandexService) {}
+  constructor(
+    @InjectQueue(SCRAPING_QUEUE_NAME)
+    private readonly queue: Queue<ScrapeJobData, ScrapeJobResult>,
+    private readonly yandexService: YandexService,
+  ) {}
 
   async onModuleInit() {
-    const connection = this.createRedisOptions();
-    this.queue = new Queue<
-      ScrapeJobData,
-      ScrapeJobResult,
-      string,
-      ScrapeJobData,
-      ScrapeJobResult,
-      string
-    >(QUEUE_NAME, {
-      connection,
-      defaultJobOptions: {
-        attempts: MAX_SCRAPE_RETRIES,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: 1000,
-        removeOnFail: 1000,
-      },
-    });
-    this.worker = new Worker<ScrapeJobData, ScrapeJobResult>(
-      QUEUE_NAME,
-      (job) => this.scrapeOffice(job),
-      { connection, concurrency: 1 },
-    );
-    this.queueEvents = new QueueEvents(QUEUE_NAME, { connection });
-    this.queueEvents.on('completed', ({ jobId }) => {
-      void this.publishTerminalJobEvent(jobId, 'completed');
-    });
-    this.queueEvents.on('failed', ({ jobId }) => {
-      void this.publishTerminalJobEvent(jobId, 'failed');
-    });
-    this.queueEvents.on('error', (error: Error) => {
-      this.logger.error('Scraping queue events error', error.stack);
-      this.failAllJobObservers(error);
-    });
-    this.worker.on('completed', (job) => {
-      void this.scheduleNextRefresh(job.data.entityId).catch((error: unknown) =>
-        this.logger.error(
-          `Could not schedule the next refresh for entity ${job.data.entityId}`,
-          error instanceof Error ? error.stack : String(error),
-        ),
-      );
-    });
-    this.worker.on('error', (error: Error) => {
-      this.logger.error('Scraping worker error', error.stack);
-    });
-    this.worker.on('failed', (job, error: Error) => {
-      if (job) {
-        this.logger.error(
-          `Scrape job ${job.id} failed for entity ${job.data.entityId}`,
-          error.stack,
-        );
-      }
-    });
-
-    await Promise.all([
-      this.queue.waitUntilReady(),
-      this.worker.waitUntilReady(),
-      this.queueEvents.waitUntilReady(),
-    ]);
+    await this.queue.waitUntilReady();
     await this.restoreRefreshJobs();
-  }
-
-  async onModuleDestroy() {
-    if (this.worker && this.queue && this.queueEvents) {
-      await Promise.all([
-        this.worker.close(),
-        this.queue.close(),
-        this.queueEvents.close(),
-      ]);
-    }
   }
 
   async requestRefresh(entityId: number): Promise<{ jobId: string }> {
@@ -168,10 +87,7 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async publishTerminalJobEvent(
-    jobId: string,
-    status: 'completed' | 'failed',
-  ) {
+  async publishTerminalJobEvent(jobId: string, status: 'completed' | 'failed') {
     if (!this.jobObservers.has(jobId)) {
       return;
     }
@@ -184,6 +100,10 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.failJobObservers(jobId, error);
     }
+  }
+
+  handleQueueEventsError(error: Error) {
+    this.failAllJobObservers(error);
   }
 
   private async getTerminalJobEvent(
@@ -235,20 +155,6 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private createRedisOptions(): { url: string; maxRetriesPerRequest: null } {
-    const redisUrl = new URL(
-      process.env['REDIS_URL'] ?? 'redis://127.0.0.1:6379',
-    );
-    if (redisUrl.protocol !== 'redis:' && redisUrl.protocol !== 'rediss:') {
-      throw new Error('REDIS_URL must use the redis:// or rediss:// protocol');
-    }
-
-    return {
-      url: redisUrl.toString(),
-      maxRetriesPerRequest: null,
-    };
-  }
-
   private async restoreRefreshJobs() {
     const entities = await db.orm.public.Entity.select(
       'id',
@@ -298,11 +204,11 @@ export class ScrapingService implements OnModuleInit, OnModuleDestroy {
     return { jobId: job.id };
   }
 
-  private async scheduleNextRefresh(entityId: number) {
+  async scheduleNextRefresh(entityId: number) {
     await this.enqueueRefresh(entityId, REFRESH_INTERVAL_MS, false);
   }
 
-  private async scrapeOffice(
+  async processScrape(
     job: Job<ScrapeJobData, ScrapeJobResult>,
   ): Promise<ScrapeJobResult> {
     const entity = await db.orm.public.Entity.first({ id: job.data.entityId });
