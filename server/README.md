@@ -6,13 +6,12 @@ The API is a NestJS application. Its database schema is defined in
 
 ## Scraper queue
 
-Office scraping runs through BullMQ with Redis. Set `REDIS_URL` in `.env`
-(defaults to `redis://127.0.0.1:6379`) and start Redis before starting the API.
-For local development, a Redis container can be started with:
+Start the local PostgreSQL 15+ and Redis services with `docker compose up -d`.
+The PostgreSQL defaults match the example `DATABASE_URL` in `.env.example`.
+These defaults are for local development only.
 
-```bash
-docker run --rm --name parser-redis -p 6379:6379 redis:7-alpine
-```
+Office scraping runs through BullMQ with Redis. Set `REDIS_URL` in `.env`
+(defaults to `redis://127.0.0.1:6379`) if Redis is hosted elsewhere.
 
 New Yandex office URLs and manual refresh requests enqueue asynchronous jobs.
 The client polls the job endpoint while a scrape runs. Successful office scrapes
