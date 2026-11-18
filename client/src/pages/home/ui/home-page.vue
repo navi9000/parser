@@ -65,14 +65,14 @@ const displayCompany = computed(() =>
 
 let operation = 0
 let viewOperation = 0
-let scrapeStreamController: AbortController | undefined
-let scrapeStreamGeneration = 0
+let scrapeWaitController: AbortController | undefined
+let scrapeWaitGeneration = 0
 let skipNormalizedSearch: { search: string; officeId: string } | null = null
 
-function stopScrapeStream() {
-  scrapeStreamGeneration += 1
-  scrapeStreamController?.abort()
-  scrapeStreamController = undefined
+function stopScrapeWait() {
+  scrapeWaitGeneration += 1
+  scrapeWaitController?.abort()
+  scrapeWaitController = undefined
 }
 
 function setOffices(nextOffices: Entity[], preferredId?: number) {
@@ -186,15 +186,15 @@ async function waitForScrapeCompletion(
   jobId: string,
   currentOperation: number,
 ) {
-  stopScrapeStream()
-  const generation = scrapeStreamGeneration
+  stopScrapeWait()
+  const generation = scrapeWaitGeneration
   const controller = new AbortController()
-  scrapeStreamController = controller
+  scrapeWaitController = controller
   jobError.value = null
   try {
     const event = await waitForScrapeJob(jobId, controller.signal)
     if (
-      generation !== scrapeStreamGeneration ||
+      generation !== scrapeWaitGeneration ||
       currentOperation !== operation
     ) {
       return
@@ -214,7 +214,7 @@ async function waitForScrapeCompletion(
     }
   } catch (error) {
     if (
-      generation === scrapeStreamGeneration &&
+      generation === scrapeWaitGeneration &&
       currentOperation === operation &&
       !controller.signal.aborted
     ) {
@@ -224,17 +224,17 @@ async function waitForScrapeCompletion(
     }
   } finally {
     if (
-      generation === scrapeStreamGeneration &&
-      scrapeStreamController === controller
+      generation === scrapeWaitGeneration &&
+      scrapeWaitController === controller
     ) {
-      scrapeStreamController = undefined
+      scrapeWaitController = undefined
     }
   }
 }
 
 async function loadSearch(input: string, officeId?: string) {
   const currentOperation = ++operation
-  stopScrapeStream()
+  stopScrapeWait()
   offices.value = []
   selectedOfficeId.value = null
   scope.value = "office"
@@ -365,7 +365,7 @@ watch(
   { immediate: true },
 )
 
-onBeforeUnmount(stopScrapeStream)
+onBeforeUnmount(stopScrapeWait)
 </script>
 
 <style scoped>

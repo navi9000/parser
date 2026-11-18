@@ -4,12 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { from, map, mergeMap, of, type Observable } from 'rxjs';
 import { db } from '../prisma/db.js';
-import {
-  ScrapingService,
-  type ScrapeJobEvent,
-} from '../scraping/scraping.service.js';
+import { ScrapingService } from '../scraping/scraping.service.js';
 import {
   aggregateOfficeStats,
   updateReviewStats,
@@ -58,13 +54,8 @@ export interface ScrapeJobStatus {
   jobId: string;
   entityId: number;
   status: string;
-  progress: boolean | number | string | object;
   failedReason: string | null;
 }
-
-export type ScrapeCompletionEvent =
-  | { status: 'completed'; entity: EntityRecord }
-  | { status: 'failed'; failedReason: string | null };
 
 @Injectable()
 export class EntitiesService {
@@ -190,19 +181,6 @@ export class EntitiesService {
 
   async getScrapeJobStatus(jobId: string): Promise<ScrapeJobStatus> {
     return this.scrapingService.getJobStatus(jobId);
-  }
-
-  watchScrapeJob(jobId: string): Observable<ScrapeCompletionEvent> {
-    return this.scrapingService.watchJob(jobId).pipe(
-      mergeMap((event: ScrapeJobEvent) => {
-        if (event.status === 'failed') {
-          return of(event);
-        }
-        return from(this.getById(event.entityId)).pipe(
-          map((entity) => ({ status: 'completed' as const, entity })),
-        );
-      }),
-    );
   }
 
   async update(

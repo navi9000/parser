@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { firstValueFrom } from 'rxjs';
 import { SCRAPING_QUEUE_NAME } from './scraping.constants.js';
 import { ScrapingService } from './scraping.service.js';
 import { YandexService } from '../yandex/yandex.service.js';
@@ -25,34 +24,31 @@ describe('ScrapingService', () => {
     await module.close();
   });
 
-  it('immediately emits completion when the job already completed', async () => {
+  it('returns the current job status', async () => {
     const job = {
       data: { entityId: 42 },
+      failedReason: null,
       getState: vi.fn().mockResolvedValue('completed'),
     };
     Object.assign(service, {
       queue: { getJob: vi.fn().mockResolvedValue(job) },
     });
 
-    await expect(firstValueFrom(service.watchJob('job-1'))).resolves.toEqual({
-      status: 'completed',
+    await expect(service.getJobStatus('job-1')).resolves.toEqual({
+      jobId: 'job-1',
       entityId: 42,
+      status: 'completed',
+      failedReason: null,
     });
   });
 
-  it('immediately emits failure when the job already failed', async () => {
-    const job = {
-      data: { entityId: 42 },
-      failedReason: 'Scrape failed',
-      getState: vi.fn().mockResolvedValue('failed'),
-    };
+  it('reports a missing job', async () => {
     Object.assign(service, {
-      queue: { getJob: vi.fn().mockResolvedValue(job) },
+      queue: { getJob: vi.fn().mockResolvedValue(undefined) },
     });
 
-    await expect(firstValueFrom(service.watchJob('job-1'))).resolves.toEqual({
-      status: 'failed',
-      failedReason: 'Scrape failed',
-    });
+    await expect(service.getJobStatus('job-1')).rejects.toThrow(
+      'Scrape job not found',
+    );
   });
 });

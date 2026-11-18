@@ -2,13 +2,12 @@ export type {
   CompanySummary,
   Entity,
   EntitySearchResult,
-  ScrapeCompletionEvent,
+  ScrapeJobCompletion,
   ScrapeJobStatus,
 } from "./model"
 export {
   fetchCompany,
   fetchEntity,
-  fetchScrapeJobStatus,
   requestEntityRefresh,
   searchForEntity,
   waitForScrapeJob,

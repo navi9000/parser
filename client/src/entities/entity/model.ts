@@ -38,10 +38,9 @@ export type ScrapeJobStatus = {
   jobId: string
   entityId: number
   status: string
-  progress: boolean | number | string | object
   failedReason: string | null
 }
 
-export type ScrapeCompletionEvent =
+export type ScrapeJobCompletion =
   | { status: "completed"; entity: Entity }
   | { status: "failed"; failedReason: string | null }
