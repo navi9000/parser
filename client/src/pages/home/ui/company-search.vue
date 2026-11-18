@@ -9,26 +9,37 @@
     clearable
     autocomplete="off"
     @keyup.enter="submit"
-    @click.clear="submit"
+    @click:clear="clearSearch"
   ></v-text-field>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from "vuetify/lib/composables/router.mjs"
+import { ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 
-const search = defineModel("search")
+const search = ref<string | null>("")
+const route = useRoute()
 const router = useRouter()
 
-const submit = () => {
-  if (!router) {
-    return
-  }
+watch(
+  () => route.query.search,
+  (value) => {
+    search.value = typeof value === "string" ? value : ""
+  },
+  { immediate: true },
+)
 
-  let value = search.value ?? ""
+function submit() {
+  const value = (search.value ?? "").trim()
   if (value) {
-    router.push(`/?search=${value}`)
+    void router.push({ path: "/", query: { search: value } })
   } else {
-    router.push("/")
+    clearSearch()
   }
+}
+
+function clearSearch() {
+  search.value = ""
+  void router.replace({ path: "/", query: {} })
 }
 </script>

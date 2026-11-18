@@ -1,20 +1,40 @@
 import { Injectable } from '@nestjs/common';
 import puppeteer from 'puppeteer';
-import fs from 'node:fs';
+
+export interface ScrapedReview {
+  author: string;
+  rating: number;
+  text: string;
+  timestamp: string;
+}
+
+export interface ScrapedOffice {
+  name: string;
+  reviewList: ScrapedReview[];
+}
 
 @Injectable()
 export class YandexService {
   parsedUrlOrNull(input: string) {
     try {
       const parsedUrl = new URL(input);
-      const hostname = parsedUrl.hostname;
-      const pathname = parsedUrl.pathname;
-
-      if (hostname !== 'yandex.com') {
+      if (
+        !['yandex.com', 'www.yandex.com'].includes(parsedUrl.hostname) ||
+        !['http:', 'https:'].includes(parsedUrl.protocol)
+      ) {
         return null;
       }
-      const [_leadingBlank, maps, org, slug, office_id] = pathname.split('/');
-      if (maps !== 'maps' || org !== 'org') {
+      const [maps, org, slug, office_id, ...extraSegments] = parsedUrl.pathname
+        .split('/')
+        .filter(Boolean);
+      if (
+        maps !== 'maps' ||
+        org !== 'org' ||
+        !slug ||
+        !office_id ||
+        extraSegments.length > 1 ||
+        extraSegments.some((segment) => segment !== 'reviews')
+      ) {
         return null;
       }
 
@@ -27,52 +47,75 @@ export class YandexService {
     }
   }
 
-  async parsePage({ slug, office_id }: { slug: string; office_id: string }) {
+  async parsePage({
+    slug,
+    office_id,
+  }: {
+    slug: string;
+    office_id: string;
+  }): Promise<ScrapedOffice> {
     const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1800, height: 1080 });
-    await page.emulateCPUThrottling(1.49);
-    await page.setExtraHTTPHeaders({
-      'User-Agent':
-        'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36',
-    });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1800, height: 1080 });
+      await page.setExtraHTTPHeaders({
+        'User-Agent':
+          'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36',
+      });
+      await page.goto(
+        `https://yandex.com/maps/org/${encodeURIComponent(slug)}/${encodeURIComponent(office_id)}/reviews`,
+        { waitUntil: 'domcontentloaded' },
+      );
+      await page.waitForSelector('.card-title-view__title');
 
-    await page.goto(`https://yandex.com/maps/org/${slug}/${office_id}/reviews`);
+      const scraped = await page.$$eval(
+        '.business-reviews-card-view__review',
+        (elements) => {
+          const text = (selector: string, root: Element) =>
+            root.querySelector(selector)?.textContent?.trim() ?? '';
 
-    const name = await page.$eval(
-      '.card-title-view__title',
-      (el) => el.innerHTML,
-    );
+          return elements.map((element) => {
+            const ratingText =
+              element
+                .querySelector('.business-rating-badge-view__stars')
+                ?.getAttribute('aria-label')
+                ?.split(' ')[1] ?? '';
 
-    const reviewList = await page.$$eval(
-      '.business-reviews-card-view__review',
-      (res) =>
-        res.map((el) => ({
-          author: el.querySelector('.business-review-view__link > span')
-            ?.innerHTML,
-          rating: Number(
-            el
-              .querySelector('.business-rating-badge-view__stars')
-              ?.attributes.getNamedItem('aria-label')
-              ?.value.split(' ')[1],
-          ),
-          text: el.querySelector('.spoiler-view__text-container')?.innerHTML,
-          timestamp: el
-            .querySelector('.business-review-view__date > meta')
-            ?.attributes.getNamedItem('content')?.value,
-        })),
-    );
+            return {
+              author: text('.business-review-view__link > span', element),
+              rating: Number(ratingText),
+              text: text('.spoiler-view__text-container', element),
+              timestamp:
+                element
+                  .querySelector('.business-review-view__date > meta')
+                  ?.getAttribute('content') ?? '',
+            };
+          });
+        },
+      );
+      const name = await page.$eval(
+        '.card-title-view__title',
+        (element) => element.textContent?.trim() ?? '',
+      );
 
-    await browser.close();
+      const reviewList = scraped.filter((review): review is ScrapedReview =>
+        Boolean(
+          review.author &&
+          review.text &&
+          review.timestamp &&
+          Number.isInteger(review.rating) &&
+          review.rating >= 1 &&
+          review.rating <= 5 &&
+          !Number.isNaN(Date.parse(review.timestamp)),
+        ),
+      );
+      if (!name) {
+        throw new Error('Yandex page did not contain a company name');
+      }
 
-    return {
-      name,
-      review_count: reviewList.length,
-      avg_rating: (
-        reviewList.reduce((prev, curr) => prev + curr.rating, 0) /
-        reviewList.length
-      ).toFixed(2),
-      reviewList,
-    };
+      return { name, reviewList };
+    } finally {
+      await browser.close();
+    }
   }
 }
