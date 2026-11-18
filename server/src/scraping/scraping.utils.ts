@@ -1,23 +1,5 @@
 import type { ScrapedReview } from '../yandex/yandex.service.js';
 
-export const REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-export function getRefreshDelay(
-  lastUpdatedAt: string | null,
-  now = Date.now(),
-): number {
-  if (!lastUpdatedAt) {
-    return 0;
-  }
-
-  const updatedAt = Date.parse(lastUpdatedAt);
-  if (Number.isNaN(updatedAt)) {
-    throw new Error(`Invalid last_updated_at value: ${lastUpdatedAt}`);
-  }
-
-  return Math.max(0, updatedAt + REFRESH_INTERVAL_MS - now);
-}
-
 export function selectNewReviews(
   reviews: ScrapedReview[],
   latestSavedTimestamp: string | null,

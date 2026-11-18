@@ -26,12 +26,6 @@ export interface EntityRecord {
 
 export type EntitySearchResult =
   | {
-      kind: 'pending';
-      entity: EntityRecord;
-      offices: EntityRecord[];
-      jobId: string;
-    }
-  | {
       kind: 'office';
       entity: EntityRecord;
       offices: EntityRecord[];
@@ -50,13 +44,6 @@ export interface CompanySummary {
   offices: EntityRecord[];
 }
 
-export interface ScrapeJobStatus {
-  jobId: string;
-  entityId: number;
-  status: string;
-  failedReason: string | null;
-}
-
 @Injectable()
 export class EntitiesService {
   constructor(
@@ -64,9 +51,7 @@ export class EntitiesService {
     private readonly scrapingService: ScrapingService,
   ) {}
 
-  async create(
-    createEntityDto: CreateEntityDto,
-  ): Promise<{ entity: EntityRecord; jobId: string }> {
+  async create(createEntityDto: CreateEntityDto): Promise<EntityRecord> {
     const { slug, office_id } = createEntityDto;
     const existing = await this.getBySlugAndOfficeId({ slug, office_id });
     if (existing) {
@@ -81,8 +66,7 @@ export class EntitiesService {
       avg_rating: createEntityDto.avg_rating ?? '0.00',
       last_updated_at: null,
     });
-    const { jobId } = await this.scrapingService.requestRefresh(entity.id);
-    return { entity, jobId };
+    return this.scrapingService.refreshEntity(entity.id);
   }
 
   async getAll(): Promise<EntityRecord[]> {
@@ -106,16 +90,25 @@ export class EntitiesService {
     const parsedInput = this.yandexService.parsedUrlOrNull(normalizedInput);
     if (parsedInput) {
       const entity = await this.getOrCreateOffice(parsedInput);
-      const offices = await this.getOfficesBySlug(entity.slug);
       if (
         !entity.last_updated_at &&
         !entity.name &&
         entity.review_count === 0
       ) {
-        const { jobId } = await this.scrapingService.requestRefresh(entity.id);
-        return { kind: 'pending' as const, entity, offices, jobId };
+        const refreshedEntity = await this.scrapingService.refreshEntity(
+          entity.id,
+        );
+        return {
+          kind: 'office' as const,
+          entity: refreshedEntity,
+          offices: await this.getOfficesBySlug(entity.slug),
+        };
       }
-      return { kind: 'office' as const, entity, offices };
+      return {
+        kind: 'office' as const,
+        entity,
+        offices: await this.getOfficesBySlug(entity.slug),
+      };
     }
 
     const matches = await db.orm.public.Entity.where({
@@ -174,13 +167,8 @@ export class EntitiesService {
     };
   }
 
-  async requestRefresh(id: number): Promise<{ jobId: string }> {
-    await this.getById(id);
-    return this.scrapingService.requestRefresh(id);
-  }
-
-  async getScrapeJobStatus(jobId: string): Promise<ScrapeJobStatus> {
-    return this.scrapingService.getJobStatus(jobId);
+  async requestRefresh(id: number): Promise<EntityRecord> {
+    return this.scrapingService.refreshEntity(id);
   }
 
   async update(

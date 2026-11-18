@@ -8,9 +8,8 @@
         :selected-office-id="selectedOfficeId"
         :scope="scope"
         :loading="searchLoading || companyLoading || reviewsLoading"
-        :searching="searchState === 'pending'"
         :error="searchError"
-        :job-error="jobError"
+        :refresh-error="refreshError"
         :refreshing="refreshing"
         @select-office="selectOffice"
         @toggle-view="toggleView"
@@ -22,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import CompanySearch from "./company-search.vue"
 import CompanyInfo from "./company-info.vue"
@@ -31,7 +30,6 @@ import {
   fetchCompany,
   requestEntityRefresh,
   searchForEntity,
-  waitForScrapeJob,
   type CompanySummary,
   type Entity,
 } from "../../../entities/entity"
@@ -48,13 +46,12 @@ const selectedOfficeId = ref<number | null>(null)
 const scope = ref<"office" | "company">("office")
 const companySummary = ref<CompanySummary | null>(null)
 const reviewList = ref<Review[] | null>(null)
-const searchState = ref<"idle" | "loading" | "pending" | "ready">("idle")
 const searchLoading = ref(false)
 const companyLoading = ref(false)
 const reviewsLoading = ref(false)
 const refreshing = ref(false)
 const searchError = ref<string | null>(null)
-const jobError = ref<string | null>(null)
+const refreshError = ref<string | null>(null)
 
 const selectedOffice = computed(
   () => offices.value.find((office) => office.id === selectedOfficeId.value) ?? null,
@@ -65,15 +62,7 @@ const displayCompany = computed(() =>
 
 let operation = 0
 let viewOperation = 0
-let scrapeWaitController: AbortController | undefined
-let scrapeWaitGeneration = 0
 let skipNormalizedSearch: { search: string; officeId: string } | null = null
-
-function stopScrapeWait() {
-  scrapeWaitGeneration += 1
-  scrapeWaitController?.abort()
-  scrapeWaitController = undefined
-}
 
 function setOffices(nextOffices: Entity[], preferredId?: number) {
   offices.value = nextOffices
@@ -182,79 +171,25 @@ async function loadSelectedView(currentOperation = operation) {
   }
 }
 
-async function waitForScrapeCompletion(
-  jobId: string,
-  currentOperation: number,
-) {
-  stopScrapeWait()
-  const generation = scrapeWaitGeneration
-  const controller = new AbortController()
-  scrapeWaitController = controller
-  jobError.value = null
-  try {
-    const event = await waitForScrapeJob(jobId, controller.signal)
-    if (
-      generation !== scrapeWaitGeneration ||
-      currentOperation !== operation
-    ) {
-      return
-    }
-
-    searchState.value = "ready"
-    refreshing.value = false
-    if (event.status === "completed") {
-      offices.value = offices.value.map((office) =>
-        office.id === event.entity.id ? event.entity : office,
-      )
-      jobError.value = null
-      normalizeOfficeSearch(event.entity)
-      await loadSelectedView(currentOperation)
-    } else {
-      jobError.value = event.failedReason ?? "The scrape job failed"
-    }
-  } catch (error) {
-    if (
-      generation === scrapeWaitGeneration &&
-      currentOperation === operation &&
-      !controller.signal.aborted
-    ) {
-      searchState.value = "ready"
-      refreshing.value = false
-      jobError.value = `Unable to wait for scrape completion: ${errorMessage(error)}`
-    }
-  } finally {
-    if (
-      generation === scrapeWaitGeneration &&
-      scrapeWaitController === controller
-    ) {
-      scrapeWaitController = undefined
-    }
-  }
-}
-
 async function loadSearch(input: string, officeId?: string) {
   const currentOperation = ++operation
-  stopScrapeWait()
   offices.value = []
   selectedOfficeId.value = null
   scope.value = "office"
   companySummary.value = null
   reviewList.value = null
   searchError.value = null
-  jobError.value = null
+  refreshError.value = null
   refreshing.value = false
   searchLoading.value = false
   companyLoading.value = false
   reviewsLoading.value = false
 
   if (!input) {
-    searchState.value = "idle"
-    searchLoading.value = false
     return
   }
 
   searchLoading.value = true
-  searchState.value = "loading"
   try {
     const result = await searchForEntity(input)
     if (currentOperation !== operation) return
@@ -265,26 +200,14 @@ async function loadSearch(input: string, officeId?: string) {
       )
       scope.value = requestedOffice ? "office" : "company"
       setOffices(result.offices, requestedOffice?.id)
-      searchState.value = "ready"
       await loadSelectedView(currentOperation)
     } else {
       setOffices(result.offices, result.entity.id)
-      if (result.kind === "pending") {
-        searchState.value = "pending"
-        refreshing.value = true
-        void waitForScrapeCompletion(
-          result.jobId,
-          currentOperation,
-        )
-      } else {
-        searchState.value = "ready"
-        normalizeOfficeSearch(result.entity)
-        await loadSelectedView(currentOperation)
-      }
+      normalizeOfficeSearch(result.entity)
+      await loadSelectedView(currentOperation)
     }
   } catch (error) {
     if (currentOperation === operation) {
-      searchState.value = "idle"
       searchError.value = errorMessage(error)
     }
   } finally {
@@ -333,15 +256,24 @@ async function refreshSelectedOffice() {
   const office = selectedOffice.value
   if (!office) return
   const currentOperation = operation
+  refreshing.value = true
+  refreshError.value = null
 
   try {
-    const { jobId } = await requestEntityRefresh(office.id)
+    const refreshedEntity = await requestEntityRefresh(office.id)
     if (currentOperation !== operation) return
-    refreshing.value = true
-    void waitForScrapeCompletion(jobId, currentOperation)
+    offices.value = offices.value.map((item) =>
+      item.id === refreshedEntity.id ? refreshedEntity : item,
+    )
+    normalizeOfficeSearch(refreshedEntity)
+    await loadSelectedView(currentOperation)
   } catch (error) {
     if (currentOperation === operation) {
-      jobError.value = errorMessage(error)
+      refreshError.value = errorMessage(error)
+    }
+  } finally {
+    if (currentOperation === operation) {
+      refreshing.value = false
     }
   }
 }
@@ -365,9 +297,7 @@ watch(
   { immediate: true },
 )
 
-onBeforeUnmount(stopScrapeWait)
 </script>
-
 <style scoped>
 :global(html),
 :global(body),

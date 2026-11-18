@@ -1,8 +1,6 @@
 import {
-  REFRESH_INTERVAL_MS,
   aggregateOfficeStats,
   getLatestSavedTimestamp,
-  getRefreshDelay,
   selectNewReviews,
   updateReviewStats,
 } from './scraping.utils.js';
@@ -16,20 +14,6 @@ const review = (timestamp: string, rating = 5): ScrapedReview => ({
 });
 
 describe('scraping utilities', () => {
-  it('schedules a refresh 24 hours after the successful update', () => {
-    const updatedAt = '2026-01-01T10:00:00.000Z';
-    const now = Date.parse(updatedAt) + 60_000;
-
-    expect(getRefreshDelay(updatedAt, now)).toBe(REFRESH_INTERVAL_MS - 60_000);
-    expect(getRefreshDelay(null, now)).toBe(0);
-  });
-
-  it('rejects invalid update timestamps', () => {
-    expect(() => getRefreshDelay('not-a-date')).toThrow(
-      'Invalid last_updated_at value',
-    );
-  });
-
   it('selects only strictly newer reviews in chronological order', () => {
     const savedTimestamp = '2026-01-02T00:00:00.000Z';
     const reviews = [

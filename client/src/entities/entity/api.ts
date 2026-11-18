@@ -3,8 +3,6 @@ import type {
   CompanySummary,
   Entity,
   EntitySearchResult,
-  ScrapeJobCompletion,
-  ScrapeJobStatus,
 } from "./model"
 
 export async function searchForEntity(input: string) {
@@ -13,8 +11,8 @@ export async function searchForEntity(input: string) {
   )
 }
 
-export async function fetchEntity(entityId: number, signal?: AbortSignal) {
-  return await request<Entity>(`/entities/${entityId}`, { signal })
+export async function fetchEntity(entityId: number) {
+  return await request<Entity>(`/entities/${entityId}`)
 }
 
 export async function fetchCompany(slug: string) {
@@ -22,31 +20,7 @@ export async function fetchCompany(slug: string) {
 }
 
 export async function requestEntityRefresh(entityId: number) {
-  return await request<{ jobId: string }>(`/entities/${entityId}/refresh`, {
+  return await request<Entity>(`/entities/${entityId}/refresh`, {
     method: "POST",
   })
-}
-
-async function fetchScrapeJobStatus(jobId: string, signal?: AbortSignal) {
-  return await request<ScrapeJobStatus>(
-    `/entities/jobs/${encodeURIComponent(jobId)}`,
-    { signal },
-  )
-}
-export async function waitForScrapeJob(
-  jobId: string,
-  signal: AbortSignal,
-): Promise<ScrapeJobCompletion> {
-  while (true) {
-    const job = await fetchScrapeJobStatus(jobId, signal)
-    if (job.status === "completed") {
-      const entity = await fetchEntity(job.entityId, signal)
-      return { status: "completed", entity }
-    }
-    if (job.status === "failed") {
-      return { status: "failed", failedReason: job.failedReason }
-    }
-
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 1000))
-  }
 }

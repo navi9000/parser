@@ -1,54 +1,57 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getQueueToken } from '@nestjs/bullmq';
-import { SCRAPING_QUEUE_NAME } from './scraping.constants.js';
-import { ScrapingService } from './scraping.service.js';
+import { db } from '../prisma/db.js';
 import { YandexService } from '../yandex/yandex.service.js';
+import { ScrapingService } from './scraping.service.js';
 
 describe('ScrapingService', () => {
   let service: ScrapingService;
   let module: TestingModule;
+  let parsePage: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    parsePage = vi.fn();
     module = await Test.createTestingModule({
       providers: [
         ScrapingService,
-        { provide: getQueueToken(SCRAPING_QUEUE_NAME), useValue: {} },
-        { provide: YandexService, useValue: { parsePage: vi.fn() } },
+        { provide: YandexService, useValue: { parsePage } },
       ],
     }).compile();
 
-    service = module.get<ScrapingService>(ScrapingService);
+    service = module.get(ScrapingService);
   });
 
   afterEach(async () => {
     await module.close();
+    vi.restoreAllMocks();
   });
 
-  it('returns the current job status', async () => {
-    const job = {
-      data: { entityId: 42 },
-      failedReason: null,
-      getState: vi.fn().mockResolvedValue('completed'),
-    };
-    Object.assign(service, {
-      queue: { getJob: vi.fn().mockResolvedValue(job) },
-    });
+  it('fails when the entity does not exist', async () => {
+    vi.spyOn(db.orm.public.Entity, 'first').mockResolvedValue(null);
 
-    await expect(service.getJobStatus('job-1')).resolves.toEqual({
-      jobId: 'job-1',
-      entityId: 42,
-      status: 'completed',
-      failedReason: null,
-    });
-  });
-
-  it('reports a missing job', async () => {
-    Object.assign(service, {
-      queue: { getJob: vi.fn().mockResolvedValue(undefined) },
-    });
-
-    await expect(service.getJobStatus('job-1')).rejects.toThrow(
-      'Scrape job not found',
+    await expect(service.refreshEntity(42)).rejects.toThrow(
+      'Entity 42 not found',
     );
+    expect(parsePage).not.toHaveBeenCalled();
+  });
+
+  it('propagates scrape failures to the caller', async () => {
+    const entity = {
+      id: 42,
+      slug: 'example',
+      office_id: '1',
+      name: null,
+      review_count: 0,
+      avg_rating: '0.00',
+      last_updated_at: null,
+    };
+    const scrapeError = new Error('Yandex is unavailable');
+    vi.spyOn(db.orm.public.Entity, 'first').mockResolvedValue(entity);
+    parsePage.mockRejectedValue(scrapeError);
+
+    await expect(service.refreshEntity(42)).rejects.toBe(scrapeError);
+    expect(parsePage).toHaveBeenCalledWith({
+      slug: entity.slug,
+      office_id: entity.office_id,
+    });
   });
 });

@@ -40,13 +40,12 @@
             {{ new Date(company.last_updated_at).toLocaleString() }}
           </p>
         </div>
-        <p v-if="searching" class="company-info__status">Загрузка данных из Яндекса…</p>
-        <p v-else-if="refreshing" class="company-info__status">Обновление данных…</p>
+        <p v-if="refreshing" class="company-info__status">Обновление данных…</p>
         <v-alert v-if="error" class="company-info__alert" type="error" density="compact">
           {{ error }}
         </v-alert>
-        <v-alert v-if="jobError" class="company-info__alert" type="error" density="compact">
-          {{ jobError }}
+        <v-alert v-if="refreshError" class="company-info__alert" type="error" density="compact">
+          {{ refreshError }}
         </v-alert>
       </v-card-text>
       <v-card-actions class="company-info__actions">
@@ -75,7 +74,7 @@
           </v-btn>
           <v-btn
             size="small"
-            :disabled="!selectedOfficeId || searching || loading"
+            :disabled="!selectedOfficeId || loading || refreshing"
             :loading="refreshing"
             @click="$emit('refresh')"
           >
@@ -103,9 +102,8 @@ interface Props {
   selectedOfficeId: number | null
   scope: "office" | "company"
   loading: boolean
-  searching: boolean
   error: string | null
-  jobError: string | null
+  refreshError: string | null
   refreshing: boolean
 }
 
