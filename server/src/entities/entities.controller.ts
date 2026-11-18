@@ -6,15 +6,19 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  MessageEvent,
   Post,
   Put,
   Query,
+  Sse,
 } from '@nestjs/common';
+import { map, type Observable } from 'rxjs';
 import { EntitiesService } from './entities.service.js';
 import { CreateEntityDto } from './dto/create-entity.dto.js';
 import { ValidationPipe } from '../shared/pipes/validation.pipe.js';
 import { UpdateEntityDto } from './dto/update-entity.dto.js';
 import { ReviewsService } from '../reviews/reviews.service.js';
+import { ScrapingService } from '../scraping/scraping.service.js';
 import { CreateReviewDto } from '../reviews/dto/create-review.dto.js';
 import type {
   CompanySummary,
@@ -27,12 +31,13 @@ export class EntitiesController {
   constructor(
     private readonly entitiesService: EntitiesService,
     private readonly reviewsService: ReviewsService,
+    private readonly scrapingService: ScrapingService,
   ) {}
 
   @Post()
   create(
     @Body(ValidationPipe) createEntityDto: CreateEntityDto,
-  ): Promise<EntityRecord> {
+  ): Promise<{ entity: EntityRecord; jobId: string }> {
     return this.entitiesService.create(createEntityDto);
   }
 
@@ -56,13 +61,22 @@ export class EntitiesController {
     return this.reviewsService.getCommentsByCompanySlug(slug);
   }
 
+  @Sse('jobs/:jobId/events')
+  watchScrapeJob(
+    @Param('jobId') jobId: string,
+  ): Observable<MessageEvent> {
+    return this.scrapingService
+      .watchJob(jobId)
+      .pipe(map((data) => ({ data })));
+  }
+
   @Get(':id')
   getById(@Param('id', ParseIntPipe) id: number): Promise<EntityRecord> {
     return this.entitiesService.getById(id);
   }
 
   @Post(':id/refresh')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   refreshById(@Param('id', ParseIntPipe) id: number) {
     return this.entitiesService.requestRefresh(id);
   }

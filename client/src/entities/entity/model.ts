@@ -10,6 +10,12 @@ export type Entity = {
 
 export type EntitySearchResult =
   | {
+      kind: "pending"
+      entity: Entity
+      offices: Entity[]
+      jobId: string
+    }
+  | {
       kind: "office"
       entity: Entity
       offices: Entity[]
@@ -27,3 +33,11 @@ export type CompanySummary = {
   avg_rating: string
   offices: Entity[]
 }
+
+export type ScrapeJobEvent =
+  | { status: "completed"; entityId: number }
+  | { status: "failed"; message: string }
+
+export type ScrapeJobCompletion =
+  | { status: "completed"; entity: Entity }
+  | { status: "failed"; message: string }

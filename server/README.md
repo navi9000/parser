@@ -4,19 +4,22 @@ The API is a NestJS application. Its database schema is defined in
 `src/prisma/contract.prisma`; regenerate its Prisma 8 artifacts with
 `pnpm contract:emit` after contract changes.
 
-## Scraper
+## Scraper queue
 
-Start the local PostgreSQL 15+ service with `docker compose up -d postgres`. The
-PostgreSQL defaults match the example `DATABASE_URL` in `.env.example`. These
-defaults are for local development only.
+Start the local PostgreSQL 15+ and Redis services with `docker compose up -d`.
+The PostgreSQL defaults match the example `DATABASE_URL` in `.env.example`.
+These defaults are for local development only.
 
-Searching for a new Yandex office or manually refreshing an office runs the
-scrape synchronously; the API responds after scraping and saving finish.
-Automatic periodic refreshes are currently disabled.
+New Yandex office URLs and manual refresh requests enqueue BullMQ jobs. The
+client listens for completion over SSE. Scrapes retry up to three times with
+exponential backoff; after the final failure, the client displays a separate
+Yandex scrape error. Invalid Yandex URLs are rejected before enqueueing, while a
+valid scrape with no reviews completes normally. Automatic periodic refreshes
+are currently disabled. Finished job records are retained for up to an hour and
+capped at 100 jobs so Redis does not accumulate an unbounded job history.
 
-BullMQ and Redis dependencies and configuration are retained for later work,
-but the BullMQ module registration is commented out in `src/app.module.ts`.
-Redis is not required for the current scraper flow.
+Set `REDIS_URL` in `.env` (defaults to `redis://127.0.0.1:6379`) if Redis is
+hosted elsewhere.
 
 The generated migration adds a unique `(slug, office_id)` constraint. Before
 applying it to a database with existing data, check for duplicate pairs and

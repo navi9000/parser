@@ -8,6 +8,7 @@
         :selected-office-id="selectedOfficeId"
         :scope="scope"
         :loading="searchLoading || companyLoading || reviewsLoading"
+        :searching="searching"
         :error="searchError"
         :refresh-error="refreshError"
         :refreshing="refreshing"
@@ -21,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import CompanySearch from "./company-search.vue"
 import CompanyInfo from "./company-info.vue"
@@ -30,6 +31,7 @@ import {
   fetchCompany,
   requestEntityRefresh,
   searchForEntity,
+  waitForScrapeJob,
   type CompanySummary,
   type Entity,
 } from "../../../entities/entity"
@@ -46,6 +48,7 @@ const selectedOfficeId = ref<number | null>(null)
 const scope = ref<"office" | "company">("office")
 const companySummary = ref<CompanySummary | null>(null)
 const reviewList = ref<Review[] | null>(null)
+const searching = ref(false)
 const searchLoading = ref(false)
 const companyLoading = ref(false)
 const reviewsLoading = ref(false)
@@ -62,7 +65,15 @@ const displayCompany = computed(() =>
 
 let operation = 0
 let viewOperation = 0
+let scrapeWaitController: AbortController | undefined
+let scrapeWaitGeneration = 0
 let skipNormalizedSearch: { search: string; officeId: string } | null = null
+
+function stopScrapeWait() {
+  scrapeWaitGeneration += 1
+  scrapeWaitController?.abort()
+  scrapeWaitController = undefined
+}
 
 function setOffices(nextOffices: Entity[], preferredId?: number) {
   offices.value = nextOffices
@@ -171,13 +182,68 @@ async function loadSelectedView(currentOperation = operation) {
   }
 }
 
+async function waitForScrapeCompletion(
+  jobId: string,
+  currentOperation: number,
+  isSearch = false,
+) {
+  stopScrapeWait()
+  const generation = scrapeWaitGeneration
+  const controller = new AbortController()
+  scrapeWaitController = controller
+  searching.value = isSearch
+  refreshing.value = true
+  refreshError.value = null
+
+  try {
+    const result = await waitForScrapeJob(jobId, controller.signal)
+    if (
+      generation !== scrapeWaitGeneration ||
+      currentOperation !== operation
+    ) {
+      return
+    }
+
+    searching.value = false
+    refreshing.value = false
+    if (result.status === "completed") {
+      offices.value = offices.value.map((office) =>
+        office.id === result.entity.id ? result.entity : office,
+      )
+      normalizeOfficeSearch(result.entity)
+      await loadSelectedView(currentOperation)
+    } else {
+      refreshError.value = result.message
+    }
+  } catch (error) {
+    if (
+      generation === scrapeWaitGeneration &&
+      currentOperation === operation &&
+      !controller.signal.aborted
+    ) {
+      searching.value = false
+      refreshing.value = false
+      refreshError.value = errorMessage(error)
+    }
+  } finally {
+    if (
+      generation === scrapeWaitGeneration &&
+      scrapeWaitController === controller
+    ) {
+      scrapeWaitController = undefined
+    }
+  }
+}
+
 async function loadSearch(input: string, officeId?: string) {
   const currentOperation = ++operation
+  stopScrapeWait()
   offices.value = []
   selectedOfficeId.value = null
   scope.value = "office"
   companySummary.value = null
   reviewList.value = null
+  searching.value = false
   searchError.value = null
   refreshError.value = null
   refreshing.value = false
@@ -203,8 +269,16 @@ async function loadSearch(input: string, officeId?: string) {
       await loadSelectedView(currentOperation)
     } else {
       setOffices(result.offices, result.entity.id)
-      normalizeOfficeSearch(result.entity)
-      await loadSelectedView(currentOperation)
+      if (result.kind === "pending") {
+        void waitForScrapeCompletion(
+          result.jobId,
+          currentOperation,
+          true,
+        )
+      } else {
+        normalizeOfficeSearch(result.entity)
+        await loadSelectedView(currentOperation)
+      }
     }
   } catch (error) {
     if (currentOperation === operation) {
@@ -260,19 +334,12 @@ async function refreshSelectedOffice() {
   refreshError.value = null
 
   try {
-    const refreshedEntity = await requestEntityRefresh(office.id)
+    const { jobId } = await requestEntityRefresh(office.id)
     if (currentOperation !== operation) return
-    offices.value = offices.value.map((item) =>
-      item.id === refreshedEntity.id ? refreshedEntity : item,
-    )
-    normalizeOfficeSearch(refreshedEntity)
-    await loadSelectedView(currentOperation)
+    void waitForScrapeCompletion(jobId, currentOperation)
   } catch (error) {
     if (currentOperation === operation) {
       refreshError.value = errorMessage(error)
-    }
-  } finally {
-    if (currentOperation === operation) {
       refreshing.value = false
     }
   }
@@ -297,6 +364,7 @@ watch(
   { immediate: true },
 )
 
+onBeforeUnmount(stopScrapeWait)
 </script>
 <style scoped>
 :global(html),

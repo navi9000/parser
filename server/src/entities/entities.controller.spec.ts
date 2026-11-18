@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EntitiesController } from './entities.controller.js';
 import { EntitiesService } from './entities.service.js';
 import { ReviewsService } from '../reviews/reviews.service.js';
+import { ScrapingService } from '../scraping/scraping.service.js';
 
 describe('EntitiesController', () => {
   let controller: EntitiesController;
@@ -12,6 +13,7 @@ describe('EntitiesController', () => {
       providers: [
         { provide: EntitiesService, useValue: {} },
         { provide: ReviewsService, useValue: {} },
+        { provide: ScrapingService, useValue: {} },
       ],
     }).compile();
 

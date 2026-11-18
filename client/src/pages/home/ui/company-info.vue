@@ -40,7 +40,8 @@
             {{ new Date(company.last_updated_at).toLocaleString() }}
           </p>
         </div>
-        <p v-if="refreshing" class="company-info__status">Обновление данных…</p>
+        <p v-if="searching" class="company-info__status">Загрузка данных из Яндекса…</p>
+        <p v-else-if="refreshing" class="company-info__status">Обновление данных…</p>
         <v-alert v-if="error" class="company-info__alert" type="error" density="compact">
           {{ error }}
         </v-alert>
@@ -59,7 +60,7 @@
           label="Офис"
           density="compact"
           hide-details
-          :disabled="loading"
+          :disabled="loading || searching || refreshing"
           @update:model-value="$emit('select-office', $event)"
         />
         <div class="company-info__buttons">
@@ -67,14 +68,14 @@
             v-if="offices.length > 1"
             size="small"
             :loading="loading"
-            :disabled="loading"
+            :disabled="loading || searching || refreshing"
             @click="$emit('toggle-view')"
           >
             {{ scope === "office" ? "Показать компанию" : "Показать офис" }}
           </v-btn>
           <v-btn
             size="small"
-            :disabled="!selectedOfficeId || loading || refreshing"
+            :disabled="!selectedOfficeId || searching || loading || refreshing"
             :loading="refreshing"
             @click="$emit('refresh')"
           >
@@ -102,6 +103,7 @@ interface Props {
   selectedOfficeId: number | null
   scope: "office" | "company"
   loading: boolean
+  searching: boolean
   error: string | null
   refreshError: string | null
   refreshing: boolean

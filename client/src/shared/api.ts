@@ -63,3 +63,45 @@ export async function request<T>(
 
   return body as T
 }
+
+export async function requestEvent<T>(
+  path: string,
+  signal: AbortSignal,
+): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const eventSource = new EventSource(`${API_BASE_URL}${path}`)
+
+    function cleanup() {
+      eventSource.onmessage = null
+      eventSource.onerror = null
+      eventSource.close()
+      signal.removeEventListener("abort", onAbort)
+    }
+
+    function onAbort() {
+      cleanup()
+      reject(new DOMException("The operation was aborted", "AbortError"))
+    }
+
+    eventSource.onmessage = (event) => {
+      cleanup()
+      try {
+        resolve(JSON.parse(event.data) as T)
+      } catch (error) {
+        reject(error)
+      }
+    }
+
+    eventSource.onerror = () => {
+      cleanup()
+      reject(new Error("The event stream connection failed"))
+    }
+
+    if (signal.aborted) {
+      onAbort()
+      return
+    }
+
+    signal.addEventListener("abort", onAbort, { once: true })
+  })
+}
